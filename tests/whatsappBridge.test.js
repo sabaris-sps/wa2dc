@@ -5,7 +5,10 @@ import test from 'node:test';
 
 import { resetClientFactoryOverrides, setClientFactoryOverrides } from '../src/clientFactories.js';
 import state from '../src/state.js';
+import storage from '../src/storage.js';
 import utils from '../src/utils.js';
+
+await storage.ensureInitialized();
 
 const snapshotObject = (value) => ({ ...value });
 const restoreObject = (target, snapshot) => {

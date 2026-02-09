@@ -79,6 +79,10 @@ const sqliteStore = {
     }
   },
 
+  isReady() {
+    return !!this._db;
+  },
+
   _decodeStoredValue(value) {
     if (!this._encryption.enabled) {
       return value;
@@ -216,6 +220,14 @@ const sqliteStore = {
         value TEXT NOT NULL,
         updated_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS message_store (
+        cache_key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_message_store_expires_at ON message_store(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_message_store_updated_at ON message_store(updated_at);
     `);
 
     this._configureEncryption(process.env.WA2DC_DB_PASSPHRASE || '');
@@ -326,6 +338,63 @@ const sqliteStore = {
   clearAuthState() {
     this._ensureDbReady();
     this._db.exec('DELETE FROM auth_keys; DELETE FROM auth_creds;');
+  },
+
+  getMessageStore(cacheKey) {
+    this._ensureDbReady();
+    const row = this._db
+      .prepare('SELECT value, expires_at AS expiresAt FROM message_store WHERE cache_key = ?')
+      .get(cacheKey);
+    if (!row) {
+      return null;
+    }
+    if (row.expiresAt <= Date.now()) {
+      this._db.prepare('DELETE FROM message_store WHERE cache_key = ?').run(cacheKey);
+      return null;
+    }
+    return {
+      value: this._decodeStoredValue(row.value),
+      expiresAt: row.expiresAt,
+    };
+  },
+
+  setMessageStore(cacheKey, value, expiresAt) {
+    this._ensureDbReady();
+    const now = Date.now();
+    this._db.prepare(`
+      INSERT INTO message_store (cache_key, value, expires_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(cache_key)
+      DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at, updated_at = excluded.updated_at
+    `).run(cacheKey, this._encodeStoredValue(value), expiresAt, now);
+  },
+
+  pruneMessageStore(maxEntries) {
+    this._ensureDbReady();
+    const now = Date.now();
+    this._db.prepare('DELETE FROM message_store WHERE expires_at <= ?').run(now);
+    if (!Number.isFinite(maxEntries) || maxEntries <= 0) {
+      return;
+    }
+    const countRow = this._db.prepare('SELECT COUNT(*) AS count FROM message_store').get();
+    const count = Number(countRow?.count || 0);
+    if (count <= maxEntries) {
+      return;
+    }
+    const overflow = count - maxEntries;
+    this._db.prepare(`
+      DELETE FROM message_store
+      WHERE cache_key IN (
+        SELECT cache_key FROM message_store
+        ORDER BY updated_at ASC
+        LIMIT ?
+      )
+    `).run(overflow);
+  },
+
+  clearMessageStore() {
+    this._ensureDbReady();
+    this._db.prepare('DELETE FROM message_store').run();
   },
 };
 

@@ -7,7 +7,10 @@ import discordJs from 'discord.js';
 
 import { resetClientFactoryOverrides, setClientFactoryOverrides } from '../src/clientFactories.js';
 import state from '../src/state.js';
+import storage from '../src/storage.js';
 import utils from '../src/utils.js';
+
+await storage.ensureInitialized();
 
 const restoreObject = (target, snapshot) => {
   Object.keys(target).forEach((key) => { delete target[key]; });
