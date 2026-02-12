@@ -159,6 +159,7 @@ const replaceLiteralMentionTokens = (text, replacements = []) => {
 
 const DISCORD_USER_MENTION_REGEX = /<@!?(\d+)>/g;
 const DISCORD_ROLE_MENTION_REGEX = /<@&(\d+)>/g;
+const DISCORD_REPLY_PREFIX_REGEX = /^(<@!?\d+>|@\S+)\s*/;
 
 const extractMentionIdsFromText = (text, regex) => {
     const ids = new Set();
@@ -250,6 +251,35 @@ const collectDiscordMentionData = async (message, textCandidates = [], replyMent
     }
 
     return { mentionDescriptors, fallbackReplacements };
+};
+
+const normalizeMentionJidsForChat = async (jid, mentionJids = []) => [...new Set((await Promise.all(
+    [...new Set((Array.isArray(mentionJids) ? mentionJids : []).filter(Boolean))]
+        .map((candidate) => utils.whatsapp.preferMentionJidForChat(candidate, jid)),
+)).filter(Boolean))];
+
+const resolveDiscordTextMentionsForWhatsApp = async ({
+    message,
+    text,
+    jid,
+    textCandidates = [],
+    replyMentionId = null,
+}) => {
+    const { mentionDescriptors, fallbackReplacements } = await collectDiscordMentionData(
+        message,
+        textCandidates,
+        replyMentionId,
+    );
+    const linkedMentions = typeof utils.whatsapp.applyDiscordMentionLinks === 'function'
+        ? await utils.whatsapp.applyDiscordMentionLinks(text, mentionDescriptors, { chatJid: jid })
+        : { text, mentionJids: [] };
+    const updatedText = replaceLiteralMentionTokens(linkedMentions.text ?? text, fallbackReplacements);
+    const mentionJidsRaw = [...new Set([
+        ...(Array.isArray(linkedMentions.mentionJids) ? linkedMentions.mentionJids : []),
+        ...utils.whatsapp.getMentionedJids(updatedText),
+    ])];
+    const mentionJids = await normalizeMentionJidsForChat(jid, mentionJidsRaw);
+    return { text: updatedText, mentionJids };
 };
 
 const handlePollUpdateMessage = async (client, rawMessage) => {
@@ -1014,11 +1044,9 @@ const connectToWhatsApp = async (retry = 1) => {
         if (embedText) {
             text = text ? `${text}\n${embedText}` : embedText;
         }
-        if (!isForwardedFromDiscord && message.reference) {
-
-
-
-            text = text.replace(/^(<@!?\d+>|@\S+)\s*/, '');
+        const hasReplyReference = !isForwardedFromDiscord && message.reference;
+        if (hasReplyReference) {
+            text = text.replace(DISCORD_REPLY_PREFIX_REGEX, '');
         }
         if (text && typeof text.normalize === 'function') {
             text = text.normalize('NFKC');
@@ -1070,7 +1098,7 @@ const connectToWhatsApp = async (retry = 1) => {
             text = text.replace(/\s{2,}/g, ' ').trim();
         }
 
-        const replyMentionId = !isForwardedFromDiscord && message.reference ? message.mentions?.repliedUser?.id : null;
+        const replyMentionId = hasReplyReference ? message.mentions?.repliedUser?.id : null;
         const mentionTextCandidates = [
             message.content,
             message.cleanContent,
@@ -1079,21 +1107,15 @@ const connectToWhatsApp = async (retry = 1) => {
             embedText,
             text,
         ];
-        const { mentionDescriptors, fallbackReplacements } = await collectDiscordMentionData(message, mentionTextCandidates, replyMentionId);
-
-        const linkedMentions = typeof utils.whatsapp.applyDiscordMentionLinks === 'function'
-            ? await utils.whatsapp.applyDiscordMentionLinks(text, mentionDescriptors, { chatJid: jid })
-            : { text, mentionJids: [] };
-        text = linkedMentions.text ?? text;
-        text = replaceLiteralMentionTokens(text, fallbackReplacements);
-
-        const mentionJidsRaw = [...new Set([
-            ...linkedMentions.mentionJids,
-            ...utils.whatsapp.getMentionedJids(text),
-        ])];
-        const mentionJids = [...new Set((await Promise.all(
-            mentionJidsRaw.map((candidate) => utils.whatsapp.preferMentionJidForChat(candidate, jid)),
-        )).filter(Boolean))];
+        const mentionResolution = await resolveDiscordTextMentionsForWhatsApp({
+            message,
+            text,
+            jid,
+            textCandidates: mentionTextCandidates,
+            replyMentionId,
+        });
+        text = mentionResolution.text;
+        const mentionJids = mentionResolution.mentionJids;
 
         if (shouldSendAttachments) {
             let first = true;
@@ -1195,9 +1217,7 @@ const connectToWhatsApp = async (retry = 1) => {
             text = text ? `${text}\n${embedText}` : embedText;
         }
         if (message.reference) {
-
-
-            text = text.replace(/^(<@!?\d+>|@\S+)\s*/, '');
+            text = text.replace(DISCORD_REPLY_PREFIX_REGEX, '');
         }
         if (text && typeof text.normalize === 'function') {
             text = text.normalize('NFKC');
@@ -1209,21 +1229,15 @@ const connectToWhatsApp = async (retry = 1) => {
 
         const replyMentionId = message.reference ? message.mentions?.repliedUser?.id : null;
         const mentionTextCandidates = [message.content, message.cleanContent, embedTextRaw, embedText, text];
-        const { mentionDescriptors, fallbackReplacements } = await collectDiscordMentionData(message, mentionTextCandidates, replyMentionId);
-
-        const linkedMentions = typeof utils.whatsapp.applyDiscordMentionLinks === 'function'
-            ? await utils.whatsapp.applyDiscordMentionLinks(text, mentionDescriptors, { chatJid: jid })
-            : { text, mentionJids: [] };
-        text = linkedMentions.text ?? text;
-        text = replaceLiteralMentionTokens(text, fallbackReplacements);
-
-        const editMentionsRaw = [...new Set([
-            ...linkedMentions.mentionJids,
-            ...utils.whatsapp.getMentionedJids(text),
-        ])];
-        const editMentions = [...new Set((await Promise.all(
-            editMentionsRaw.map((candidate) => utils.whatsapp.preferMentionJidForChat(candidate, jid)),
-        )).filter(Boolean))];
+        const mentionResolution = await resolveDiscordTextMentionsForWhatsApp({
+            message,
+            text,
+            jid,
+            textCandidates: mentionTextCandidates,
+            replyMentionId,
+        });
+        text = mentionResolution.text;
+        const editMentions = mentionResolution.mentionJids;
         try {
             const editMsg = await client.sendMessage(
                 jid,
