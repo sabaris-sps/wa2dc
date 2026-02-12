@@ -69,7 +69,7 @@ run(getBin('npm'), ['run', 'bundle']);
 const pkgArgs = [
   '-y',
   '@yao-pkg/pkg',
-  'out.cjs',
+  'out.js',
   '-t',
   target,
   '--options',

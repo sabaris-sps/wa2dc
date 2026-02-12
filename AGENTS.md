@@ -44,7 +44,7 @@ Use these docs for detailed guidance:
 - Respect whitelist and one-way routing checks when touching message flows.
 - Do not hardcode PN vs LID assumptions for WhatsApp identifiers.
 - Keep Discord output within platform limits (message length / file size).
-- Treat `out.cjs`, `out.js`, and `build/` as generated artifacts.
+- Treat `out.js` and `build/` as generated artifacts.
 - Never commit secrets (`.env`, auth state, tokens, session blobs).
 
 ## Runtime artifacts to avoid breaking
