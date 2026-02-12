@@ -652,10 +652,40 @@ const formatEmbedTextBlock = (embed = {}, includeUrls = true) => {
   return lines.join('\n').trim();
 };
 
+const normalizeAttachmentUrlForDedupe = (value = '') => {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return trimmed;
+    }
+    parsed.search = '';
+    parsed.hash = '';
+    if (parsed.hostname === 'media.discordapp.net') {
+      parsed.hostname = 'cdn.discordapp.com';
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+};
+
 const dedupeAttachments = (attachments = []) => {
   const seen = new Set();
-  return attachments.filter((attachment) => {
-    const key = `${attachment?.url || ''}|${attachment?.name || ''}`;
+  return attachments.filter((attachment, index) => {
+    const urlKey = normalizeAttachmentUrlForDedupe(attachment?.url);
+    const idKey = attachment?.id ? String(attachment.id) : '';
+    const nameKey = typeof attachment?.name === 'string' ? attachment.name.trim().toLowerCase() : '';
+    const contentTypeKey = typeof attachment?.contentType === 'string' ? attachment.contentType.trim().toLowerCase() : '';
+    const key = urlKey
+      ? `url:${urlKey}`
+      : idKey
+        ? `id:${idKey}`
+        : nameKey
+          ? `name:${nameKey}|type:${contentTypeKey}`
+          : `idx:${index}`;
     if (seen.has(key)) {
       return false;
     }
@@ -1716,12 +1746,13 @@ const discord = {
     for (const embed of embeds) {
       const baseName = embed?.title || embed?.provider?.name || 'discord-embed';
       for (const mediaUrl of pickEmbedMediaCandidates(embed)) {
-        if (seenUrls.has(mediaUrl) || isSupportedGifUrl(mediaUrl)) continue;
+        const normalizedUrl = normalizeAttachmentUrlForDedupe(mediaUrl);
+        if (!normalizedUrl || seenUrls.has(normalizedUrl) || isSupportedGifUrl(mediaUrl)) continue;
         const extension = guessExtensionFromUrl(mediaUrl);
         if (!extension) continue;
         const contentType = extensionToMime(extension);
         if (!contentType.startsWith('image/') && !contentType.startsWith('video/')) continue;
-        seenUrls.add(mediaUrl);
+        seenUrls.add(normalizedUrl);
         attachments.push({
           url: mediaUrl,
           name: `${sanitizeFileName(baseName, 'discord-embed')}.${extension}`,

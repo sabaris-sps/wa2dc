@@ -568,6 +568,59 @@ test('Discord embeds can be mirrored to WhatsApp with mention conversion', async
   }
 });
 
+test('Discord embed images are not duplicated when CDN and proxy URLs point to the same media', async () => {
+  const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
+  const originalEmbedSetting = state.settings.DiscordEmbedsToWhatsApp;
+  try {
+    state.settings.DiscordEmbedsToWhatsApp = true;
+    utils.whatsapp.createDocumentContent = (attachment) => ({
+      document: { url: attachment.url },
+      fileName: attachment.name,
+      mimetype: attachment.contentType,
+    });
+
+    const cdnUrl = 'https://cdn.discordapp.com/attachments/123/456/embed-image.png?ex=abc&is=def&hm=123';
+    const proxyUrl = 'https://media.discordapp.net/attachments/123/456/embed-image.png?width=1024&height=768';
+    harness.fakeClient.ev.emit('discordMessage', {
+      jid: 'jid@s.whatsapp.net',
+      message: {
+        id: 'dc-embed-image-dedupe',
+        content: '',
+        cleanContent: '',
+        webhookId: null,
+        author: { username: 'BridgeUser' },
+        member: { displayName: 'BridgeUser' },
+        channel: { send: async () => {} },
+        attachments: new Map([
+          ['attachment-1', {
+            id: 'attachment-1',
+            url: cdnUrl,
+            name: 'upload.png',
+            contentType: 'image/png',
+          }],
+        ]),
+        stickers: new Map(),
+        embeds: [{
+          title: 'Embed Image',
+          image: {
+            url: cdnUrl,
+            proxy_url: proxyUrl,
+          },
+        }],
+        mentions: { users: new Map(), members: new Map(), roles: new Map() },
+      },
+    });
+
+    await delay(0);
+
+    assert.equal(harness.fakeClient.sendCalls.length, 1);
+    assert.equal(harness.fakeClient.sendCalls[0]?.content?.document?.url, cdnUrl);
+  } finally {
+    state.settings.DiscordEmbedsToWhatsApp = originalEmbedSetting;
+    harness.cleanup();
+  }
+});
+
 test('Discord replies warn with interpolated message storage size when quoted message is missing', async () => {
   const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
   const originalLimit = state.settings.lastMessageStorage;
