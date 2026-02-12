@@ -223,6 +223,56 @@ const normalizeForwardSnapshotAttachment = (attachment, index = 0) => {
   };
 };
 
+const normalizeForwardSnapshotEmbedMedia = (media = {}) => {
+  if (!media || typeof media !== 'object') return null;
+  const url = media.url || null;
+  const proxyURL = media.proxyURL || media.proxy_url || media.proxyUrl || null;
+  if (!url && !proxyURL) return null;
+  return {
+    ...(url ? { url } : {}),
+    ...(proxyURL ? { proxyURL } : {}),
+  };
+};
+
+const normalizeForwardSnapshotEmbed = (embed = {}) => {
+  if (!embed || typeof embed !== 'object') return null;
+
+  const fields = Array.isArray(embed.fields)
+    ? embed.fields
+      .map((field = {}) => {
+        if (!field || typeof field !== 'object') return null;
+        const name = typeof field.name === 'string' ? field.name : '';
+        const value = typeof field.value === 'string' ? field.value : '';
+        if (!name && !value) return null;
+        return {
+          ...(name ? { name } : {}),
+          ...(value ? { value } : {}),
+        };
+      })
+      .filter(Boolean)
+    : [];
+  const authorName = embed.author?.name;
+  const footerText = embed.footer?.text;
+  const providerName = embed.provider?.name;
+  const image = normalizeForwardSnapshotEmbedMedia(embed.image);
+  const video = normalizeForwardSnapshotEmbedMedia(embed.video);
+  const thumbnail = normalizeForwardSnapshotEmbedMedia(embed.thumbnail);
+  const normalized = {
+    ...(typeof authorName === 'string' && authorName.trim() ? { author: { name: authorName } } : {}),
+    ...(typeof embed.title === 'string' && embed.title.trim() ? { title: embed.title } : {}),
+    ...(typeof embed.description === 'string' && embed.description.trim() ? { description: embed.description } : {}),
+    ...(typeof embed.url === 'string' && embed.url.trim() ? { url: embed.url } : {}),
+    ...(fields.length ? { fields } : {}),
+    ...(typeof footerText === 'string' && footerText.trim() ? { footer: { text: footerText } } : {}),
+    ...(typeof providerName === 'string' && providerName.trim() ? { provider: { name: providerName } } : {}),
+    ...(image ? { image } : {}),
+    ...(video ? { video } : {}),
+    ...(thumbnail ? { thumbnail } : {}),
+  };
+  if (!Object.keys(normalized).length) return null;
+  return normalized;
+};
+
 const extractForwardSnapshot = (rawData = {}) => {
   const snapshots = Array.isArray(rawData.message_snapshots)
     ? rawData.message_snapshots
@@ -241,9 +291,13 @@ const extractForwardSnapshot = (rawData = {}) => {
   const attachments = snapshotAttachments
     .map((attachment, index) => normalizeForwardSnapshotAttachment(attachment, index))
     .filter(Boolean);
+  const snapshotEmbeds = Array.isArray(snapshotMessage?.embeds) ? snapshotMessage.embeds : [];
+  const embeds = snapshotEmbeds
+    .map((embed) => normalizeForwardSnapshotEmbed(embed))
+    .filter(Boolean);
 
-  if (!content && !attachments.length) return null;
-  return { content, attachments };
+  if (!content && !attachments.length && !embeds.length) return null;
+  return { content, attachments, ...(embeds.length ? { embeds } : {}) };
 };
 
 const cacheDiscordMessageLocation = (message, fallbackChannelId = null) => {

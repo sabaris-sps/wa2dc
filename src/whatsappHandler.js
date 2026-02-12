@@ -1013,6 +1013,7 @@ const connectToWhatsApp = async (retry = 1) => {
         const forwardSnapshot = isForwardedFromDiscord && message?.wa2dcForwardSnapshot
             ? message.wa2dcForwardSnapshot
             : null;
+        const snapshotEmbeds = Array.isArray(forwardSnapshot?.embeds) ? forwardSnapshot.embeds : [];
 
         if (!isForwardedFromDiscord && message.reference) {
             options.quoted = await utils.whatsapp.createQuoteMessage(message, jid);
@@ -1031,9 +1032,20 @@ const connectToWhatsApp = async (retry = 1) => {
         if (isForwardedFromDiscord && !text && typeof forwardSnapshot?.content === 'string') {
             text = utils.whatsapp.convertDiscordFormatting(forwardSnapshot.content);
         }
-        const embedTextRaw = embedMirroringEnabled && typeof utils.discord.extractEmbedText === 'function'
-            ? utils.discord.extractEmbedText(message, { includeUrls: true })
-            : '';
+        const embedTextSegments = [];
+        if (embedMirroringEnabled && typeof utils.discord.extractEmbedText === 'function') {
+            const messageEmbedTextRaw = utils.discord.extractEmbedText(message, { includeUrls: true });
+            if (messageEmbedTextRaw) {
+                embedTextSegments.push(messageEmbedTextRaw);
+            }
+            if (snapshotEmbeds.length) {
+                const snapshotEmbedTextRaw = utils.discord.extractEmbedText(snapshotEmbeds, { includeUrls: true });
+                if (snapshotEmbedTextRaw && !embedTextSegments.includes(snapshotEmbedTextRaw)) {
+                    embedTextSegments.push(snapshotEmbedTextRaw);
+                }
+            }
+        }
+        const embedTextRaw = embedTextSegments.join('\n\n');
         const embedText = embedTextRaw ? utils.whatsapp.convertDiscordFormatting(embedTextRaw) : '';
         if (embedText) {
             text = text ? `${text}\n${embedText}` : embedText;
@@ -1063,6 +1075,15 @@ const connectToWhatsApp = async (retry = 1) => {
             includeEmbedAttachments: embedMirroringEnabled,
         });
         const attachments = [...(media.attachments || [])];
+        const snapshotEmbedMedia = embedMirroringEnabled && snapshotEmbeds.length
+            ? utils.discord.collectMessageMedia({ embeds: snapshotEmbeds }, { includeEmbedAttachments: true })
+            : { attachments: [], consumedUrls: [] };
+        for (const snapshotEmbedAttachment of (snapshotEmbedMedia.attachments || [])) {
+            const url = typeof snapshotEmbedAttachment?.url === 'string' ? snapshotEmbedAttachment.url : '';
+            if (!url) continue;
+            if (attachments.some((existing) => existing?.url === url)) continue;
+            attachments.push(snapshotEmbedAttachment);
+        }
         const snapshotAttachments = Array.isArray(forwardSnapshot?.attachments) ? forwardSnapshot.attachments : [];
         for (const snapshotAttachment of snapshotAttachments) {
             const url = typeof snapshotAttachment?.url === 'string' ? snapshotAttachment.url : '';
@@ -1078,7 +1099,7 @@ const connectToWhatsApp = async (retry = 1) => {
                     : 'application/octet-stream',
             });
         }
-        const consumedUrls = media.consumedUrls || [];
+        const consumedUrls = [...(media.consumedUrls || []), ...(snapshotEmbedMedia.consumedUrls || [])];
         const shouldSendAttachments = state.settings.UploadAttachments && attachments.length > 0;
 
         if (shouldSendAttachments && consumedUrls.length && text) {

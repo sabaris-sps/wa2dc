@@ -586,15 +586,22 @@ const guessExtensionFromUrl = (url = '') => {
 const extensionToMime = (ext = '') => MIME_BY_EXTENSION[ext] || 'application/octet-stream';
 
 const isSupportedGifUrl = (url = '') => GIF_URL_EXTENSION_REGEX.test(url);
+const resolveEmbedList = (input = null) => {
+  const embeds = Array.isArray(input) ? input : input?.embeds;
+  return Array.isArray(embeds) ? embeds : [];
+};
 
 const pickEmbedMediaUrl = (embed = {}) => {
   const candidates = [
     embed.video?.url,
     embed.video?.proxyURL,
+    embed.video?.proxy_url,
     embed.image?.url,
     embed.image?.proxyURL,
+    embed.image?.proxy_url,
     embed.thumbnail?.url,
     embed.thumbnail?.proxyURL,
+    embed.thumbnail?.proxy_url,
   ].filter((candidate) => typeof candidate === 'string' && candidate.startsWith('http'));
   if (!candidates.length) {
     return null;
@@ -606,10 +613,13 @@ const pickEmbedMediaUrl = (embed = {}) => {
 const pickEmbedMediaCandidates = (embed = {}) => [
   embed.image?.url,
   embed.image?.proxyURL,
+  embed.image?.proxy_url,
   embed.video?.url,
   embed.video?.proxyURL,
+  embed.video?.proxy_url,
   embed.thumbnail?.url,
   embed.thumbnail?.proxyURL,
+  embed.thumbnail?.proxy_url,
 ].filter((candidate) => typeof candidate === 'string' && candidate.startsWith('http'));
 
 const formatEmbedTextBlock = (embed = {}, includeUrls = true) => {
@@ -1675,9 +1685,9 @@ const discord = {
     }
     return attachments;
   },
-  extractGifEmbedAttachments(message) {
-    const embeds = message?.embeds;
-    if (!Array.isArray(embeds) || !embeds.length) return [];
+  extractGifEmbedAttachments(messageOrEmbeds) {
+    const embeds = resolveEmbedList(messageOrEmbeds);
+    if (!embeds.length) return [];
     const attachments = [];
     for (const embed of embeds) {
       const mediaUrl = pickEmbedMediaUrl(embed);
@@ -1698,9 +1708,9 @@ const discord = {
     }
     return attachments;
   },
-  extractEmbedMediaAttachments(message) {
-    const embeds = message?.embeds;
-    if (!Array.isArray(embeds) || !embeds.length) return [];
+  extractEmbedMediaAttachments(messageOrEmbeds) {
+    const embeds = resolveEmbedList(messageOrEmbeds);
+    if (!embeds.length) return [];
     const attachments = [];
     const seenUrls = new Set();
     for (const embed of embeds) {
@@ -1721,9 +1731,9 @@ const discord = {
     }
     return attachments;
   },
-  extractEmbedText(message, { includeUrls = true } = {}) {
-    const embeds = message?.embeds;
-    if (!Array.isArray(embeds) || !embeds.length) return '';
+  extractEmbedText(messageOrEmbeds, { includeUrls = true } = {}) {
+    const embeds = resolveEmbedList(messageOrEmbeds);
+    if (!embeds.length) return '';
     const blocks = embeds
       .map((embed) => formatEmbedTextBlock(embed, includeUrls))
       .filter(Boolean);

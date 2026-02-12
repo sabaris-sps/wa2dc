@@ -480,7 +480,26 @@ test('Discord raw forward metadata is emitted in discordMessage payload', async 
       t: 'MESSAGE_CREATE',
       d: {
         id: 'discord-msg-1',
-        message_snapshots: [{ id: 'snap-1' }],
+        message_snapshots: [{
+          id: 'snap-1',
+          message: {
+            content: 'forward snapshot body',
+            attachments: [{
+              id: 'att-1',
+              filename: 'forward.png',
+              content_type: 'image/png',
+              url: 'https://cdn.discordapp.com/attachments/forward.png',
+            }],
+            embeds: [{
+              title: 'Forwarded Embed',
+              description: 'embed text',
+              url: 'https://example.com/embed',
+              image: {
+                proxy_url: 'https://media.discordapp.net/attachments/forward-embed.png',
+              },
+            }],
+          },
+        }],
         message_reference: {
           channel_id: 'source-channel',
           message_id: 'source-message',
@@ -505,6 +524,22 @@ test('Discord raw forward metadata is emitted in discordMessage payload', async 
       sourceChannelId: 'source-channel',
       sourceMessageId: 'source-message',
       sourceGuildId: 'source-guild',
+    });
+    assert.deepEqual(waEvents[0].message.wa2dcForwardSnapshot, {
+      content: 'forward snapshot body',
+      attachments: [{
+        url: 'https://cdn.discordapp.com/attachments/forward.png',
+        name: 'forward.png',
+        contentType: 'image/png',
+      }],
+      embeds: [{
+        title: 'Forwarded Embed',
+        description: 'embed text',
+        url: 'https://example.com/embed',
+        image: {
+          proxyURL: 'https://media.discordapp.net/attachments/forward-embed.png',
+        },
+      }],
     });
   } finally {
     utils.discord.getGuild = originalDiscordUtils.getGuild;
