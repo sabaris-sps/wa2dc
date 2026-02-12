@@ -9,6 +9,11 @@ import groupMetadataCache from './groupMetadataCache.js';
 import messageStore from './messageStore.js';
 import { createDiscordClient } from './clientFactories.js';
 import { resolveRestartFlagPath } from './runnerLogic.js';
+import {
+  ONE_WAY_MODES,
+  oneWayAllowsDiscordToWhatsApp,
+  oneWayAllowsWhatsAppToDiscord,
+} from './oneWay.js';
 
 const { Intents, Constants, MessageActionRow, MessageButton } = discordJs;
 
@@ -44,6 +49,8 @@ const discordForwardContextTimers = new Map();
 const discordMessageLocationCache = new Map();
 const discordMessageLocationTimers = new Map();
 let restartInProgress = false;
+const allowsWhatsAppToDiscord = () => oneWayAllowsWhatsAppToDiscord(state.settings.oneWay);
+const allowsDiscordToWhatsApp = () => oneWayAllowsDiscordToWhatsApp(state.settings.oneWay);
 
 const requestSafeRestart = async (
   ctx,
@@ -841,7 +848,7 @@ const noteDiscordTypingInChannel = (channelId, jid) => {
 };
 
 client.on('typingStart', async (typing) => {
-  if ((state.settings.oneWay >> 1 & 1) === 0) return;
+  if (!allowsDiscordToWhatsApp()) return;
 
   const user = typing?.user;
   if (user?.bot) return;
@@ -855,7 +862,7 @@ client.on('typingStart', async (typing) => {
 });
 
 client.on('whatsappMessage', async (message) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0) {
+  if (!allowsWhatsAppToDiscord()) {
     return;
   }
   try {
@@ -889,7 +896,7 @@ client.on('whatsappMessage', async (message) => {
 });
 
 client.on('whatsappReaction', async (reaction) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0) {
+  if (!allowsWhatsAppToDiscord()) {
     return;
   }
 
@@ -919,7 +926,7 @@ client.on('whatsappReaction', async (reaction) => {
 });
 
 client.on('whatsappRead', async ({ id, jid }) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0 || !state.settings.ReadReceipts) { return; }
+  if (!allowsWhatsAppToDiscord() || !state.settings.ReadReceipts) { return; }
   const channelId = state.chats[jid]?.channelId;
   const messageId = state.lastMessages[id];
   if (!channelId || !messageId || deliveredMessages.has(messageId)) { return; }
@@ -980,7 +987,7 @@ client.on('whatsappRead', async ({ id, jid }) => {
 });
 
 client.on('whatsappDelete', async ({ id, jid }) => {
-  if (!state.settings.DeleteMessages || (state.settings.oneWay >> 0 & 1) === 0) {
+  if (!state.settings.DeleteMessages || !allowsWhatsAppToDiscord()) {
     return;
   }
 
@@ -1010,7 +1017,7 @@ client.on('whatsappDelete', async ({ id, jid }) => {
 });
 
 client.on('whatsappCall', async ({ call, jid }) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0) {
+  if (!allowsWhatsAppToDiscord()) {
     return;
   }
 
@@ -1040,7 +1047,7 @@ client.on('whatsappCall', async ({ call, jid }) => {
 });
 
 client.on('whatsappPin', async ({ jid, key, pinned }) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0) {
+  if (!allowsWhatsAppToDiscord()) {
     return;
   }
   const channelId = state.chats[jid]?.channelId;
@@ -2449,13 +2456,13 @@ const commandHandlers = {
       const direction = ctx.getStringOption('direction');
 
       if (direction === 'disabled') {
-        state.settings.oneWay = 0b11;
+        state.settings.oneWay = ONE_WAY_MODES.TWO_WAY;
         await ctx.reply('Two way communication is enabled.');
       } else if (direction === 'whatsapp') {
-        state.settings.oneWay = 0b10;
+        state.settings.oneWay = ONE_WAY_MODES.TO_WHATSAPP_ONLY;
         await ctx.reply('Messages will be only sent to WhatsApp.');
       } else if (direction === 'discord') {
-        state.settings.oneWay = 0b01;
+        state.settings.oneWay = ONE_WAY_MODES.TO_DISCORD_ONLY;
         await ctx.reply('Messages will be only sent to Discord.');
       }
     },

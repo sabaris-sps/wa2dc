@@ -17,11 +17,13 @@ import groupMetadataCache from './groupMetadataCache.js';
 import messageStore from './messageStore.js';
 import { createGroupRefreshScheduler } from './groupMetadataRefresh.js';
 import { getPollEncKey, getPollOptions } from './pollUtils.js';
+import { oneWayAllowsDiscordToWhatsApp } from './oneWay.js';
 
 
 let authState;
 let saveState;
 let groupCachePruneInterval = null;
+const allowsDiscordToWhatsApp = () => oneWayAllowsDiscordToWhatsApp(state.settings.oneWay);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const formatDisconnectReason = (statusCode) => {
     if (typeof statusCode !== 'number') return 'unknown';
@@ -91,6 +93,10 @@ const toBuffer = (val) => {
     }
     return null;
 };
+
+const selectPnJid = (list = []) => (
+    list.find((jid) => typeof jid === 'string' && jid.endsWith('@s.whatsapp.net')) || null
+);
 
 const expandJidVariants = async (jid) => {
     const variants = new Set();
@@ -974,7 +980,7 @@ const connectToWhatsApp = async (retry = 1) => {
     });
 
     client.ev.on('discordMessage', async ({ jid, message, forwardContext }) => {
-        if ((state.settings.oneWay >> 1 & 1) === 0) {
+        if (!allowsDiscordToWhatsApp()) {
             return;
         }
 
@@ -1164,7 +1170,7 @@ const connectToWhatsApp = async (retry = 1) => {
     });
 
     client.ev.on('discordEdit', async ({ jid, message }) => {
-        if ((state.settings.oneWay >> 1 & 1) === 0) {
+        if (!allowsDiscordToWhatsApp()) {
             return;
         }
 
@@ -1235,7 +1241,7 @@ const connectToWhatsApp = async (retry = 1) => {
     });
 
     client.ev.on('discordReaction', async ({ jid, reaction, removed }) => {
-        if ((state.settings.oneWay >> 1 & 1) === 0) {
+        if (!allowsDiscordToWhatsApp()) {
             return;
         }
 
@@ -1266,7 +1272,7 @@ const connectToWhatsApp = async (retry = 1) => {
     });
 
     client.ev.on('discordDelete', async ({ jid, id }) => {
-        if ((state.settings.oneWay >> 1 & 1) === 0) {
+        if (!allowsDiscordToWhatsApp()) {
             return;
         }
 
@@ -1298,4 +1304,3 @@ const actions = {
 
 export { connectToWhatsApp };
 export default actions;
-    const selectPnJid = (list = []) => list.find((jid) => typeof jid === 'string' && jid.endsWith('@s.whatsapp.net')) || null;

@@ -1,3 +1,5 @@
+import { ONE_WAY_MODES } from './oneWay.js';
+
 const state = {
   settings: {
     Whitelist: [],
@@ -32,7 +34,7 @@ const state = {
     MirrorWAStatuses: true,
     autoSaveInterval: 5 * 60,
     lastMessageStorage: 500,
-    oneWay: 0b11,
+    oneWay: ONE_WAY_MODES.TWO_WAY,
     redirectBots: true,
     redirectWebhooks: false,
     redirectAnnouncementWebhooks: false,
