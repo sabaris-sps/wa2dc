@@ -61,6 +61,18 @@ Usage: `/newsletterpicture mode:<set|remove> url:<required when mode=set> jid:<o
 Fetch the newsletter admin count.  
 Usage: `/newsletteradmincount jid:<optional ...@newsletter>`
 
+### `/newslettersubscribers`
+Fetch the current newsletter subscriber count.  
+Usage: `/newslettersubscribers jid:<optional ...@newsletter>`
+
+### `/newsletterfollow`
+Follow a newsletter.  
+Usage: `/newsletterfollow jid:<optional ...@newsletter>`
+
+### `/newsletterunfollow`
+Unfollow a newsletter.  
+Usage: `/newsletterunfollow jid:<optional ...@newsletter>`
+
 ### `/newslettermute`
 Mute a newsletter.  
 Usage: `/newslettermute jid:<optional ...@newsletter>`
@@ -69,13 +81,38 @@ Usage: `/newslettermute jid:<optional ...@newsletter>`
 Unmute a newsletter.  
 Usage: `/newsletterunmute jid:<optional ...@newsletter>`
 
+### `/newsletterupdatename`
+Update only the newsletter name.  
+Usage: `/newsletterupdatename name:"new title" jid:<optional ...@newsletter>`
+
+### `/newsletterupdatedescription`
+Update only the newsletter description.  
+Usage: `/newsletterupdatedescription description:"new text" jid:<optional ...@newsletter>`
+
 ### `/newslettermessages`
 Fetch recent messages from a newsletter.  
 Usage: `/newslettermessages jid:<optional ...@newsletter> count:<1-50> before:<unix seconds> after:<unix seconds>`
 
+### `/newsletterreact`
+React to a newsletter message (or remove your reaction).  
+Usage: `/newsletterreact serverid:<newsletter message id> reaction:<optional emoji> jid:<optional ...@newsletter>`  
+If `reaction` is omitted, WA2DC removes your existing reaction for that message.
+
+### `/newslettersubscribeupdates`
+Request newsletter live updates subscription metadata.  
+Usage: `/newslettersubscribeupdates jid:<optional ...@newsletter>`
+
 ### `/newslettermetadata`
 Fetch raw newsletter metadata (including viewer role if exposed by WhatsApp).  
 Usage: `/newslettermetadata jid:<optional ...@newsletter>`
+
+### `/newsletterchangeowner`
+Transfer newsletter ownership to another WhatsApp user JID/number.  
+Usage: `/newsletterchangeowner user:<jid or number> jid:<optional ...@newsletter>`
+
+### `/newsletterdemote`
+Demote a newsletter admin by WhatsApp user JID/number.  
+Usage: `/newsletterdemote user:<jid or number> jid:<optional ...@newsletter>`
 
 ### `/newsletterdelete`
 Delete a newsletter (irreversible) and remove its local bridge mapping.  

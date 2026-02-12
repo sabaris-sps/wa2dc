@@ -1186,6 +1186,25 @@ const resolveNewsletterJidFromCommand = async (ctx, { optionName = 'jid' } = {})
   return jid;
 };
 
+const resolveUserJidOption = async (ctx, {
+  optionName = 'user',
+  description = 'user',
+} = {}) => {
+  const rawOption = ctx.getStringOption(optionName)?.trim();
+  if (!rawOption) {
+    await ctx.reply(`Please provide ${description} via \`${optionName}:<...>\`.`);
+    return null;
+  }
+
+  const jid = utils.whatsapp.formatJid(utils.whatsapp.toJid(rawOption) || rawOption);
+  if (!jid) {
+    await ctx.reply(`Could not resolve \`${rawOption}\` to a WhatsApp JID.`);
+    return null;
+  }
+
+  return jid;
+};
+
 const requireNewsletterMethod = async (ctx, methodName) => {
   const method = state.waClient?.[methodName];
   if (typeof method !== 'function') {
@@ -1517,6 +1536,105 @@ const commandHandlers = {
       );
     },
   },
+  newslettersubscribers: {
+    description: 'Get subscriber count for a newsletter.',
+    options: [
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const getSubscribers = await requireNewsletterMethod(ctx, 'newsletterSubscribers');
+      if (!getSubscribers) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      let result;
+      try {
+        result = await getSubscribers(jid);
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to fetch newsletter subscriber count');
+        await ctx.reply(`Failed to fetch subscribers for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+
+      const count = Number(result?.subscribers ?? result?.count ?? result);
+      if (Number.isFinite(count)) {
+        await ctx.reply(`Subscribers for \`${formatNewsletterJidForReply(jid)}\`: ${count}`);
+        return;
+      }
+      await ctx.replyPartitioned(
+        `Subscriber response for \`${formatNewsletterJidForReply(jid)}\`:\n\`\`\`json\n${formatJsonForReply(result)}\n\`\`\``
+      );
+    },
+  },
+  newsletterfollow: {
+    description: 'Follow a newsletter.',
+    options: [
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const followNewsletter = await requireNewsletterMethod(ctx, 'newsletterFollow');
+      if (!followNewsletter) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      try {
+        await followNewsletter(jid);
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to follow newsletter');
+        await ctx.reply(`Failed to follow \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+      await ctx.reply(`Followed \`${formatNewsletterJidForReply(jid)}\`.`);
+    },
+  },
+  newsletterunfollow: {
+    description: 'Unfollow a newsletter.',
+    options: [
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const unfollowNewsletter = await requireNewsletterMethod(ctx, 'newsletterUnfollow');
+      if (!unfollowNewsletter) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      try {
+        await unfollowNewsletter(jid);
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to unfollow newsletter');
+        await ctx.reply(`Failed to unfollow \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+      await ctx.reply(`Unfollowed \`${formatNewsletterJidForReply(jid)}\`.`);
+    },
+  },
   newslettermute: {
     description: 'Mute a newsletter.',
     options: [
@@ -1573,6 +1691,94 @@ const commandHandlers = {
         return;
       }
       await ctx.reply(`Unmuted \`${formatNewsletterJidForReply(jid)}\`.`);
+    },
+  },
+  newsletterupdatename: {
+    description: 'Update newsletter name.',
+    options: [
+      {
+        name: 'name',
+        description: 'New newsletter name.',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: true,
+      },
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const updateName = await requireNewsletterMethod(ctx, 'newsletterUpdateName');
+      if (!updateName) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      const name = ctx.getStringOption('name')?.trim();
+      if (!name) {
+        await ctx.reply('Please provide a newsletter name.');
+        return;
+      }
+
+      try {
+        await updateName(jid, name);
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to update newsletter name');
+        await ctx.reply(`Failed to update name for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+      state.contacts[jid] = name;
+      if (state.waClient?.contacts) {
+        state.waClient.contacts[jid] = name;
+      }
+      await ctx.reply(`Updated name for \`${formatNewsletterJidForReply(jid)}\`.`);
+    },
+  },
+  newsletterupdatedescription: {
+    description: 'Update newsletter description.',
+    options: [
+      {
+        name: 'description',
+        description: 'New newsletter description.',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: true,
+      },
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const updateDescription = await requireNewsletterMethod(ctx, 'newsletterUpdateDescription');
+      if (!updateDescription) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      const description = ctx.getStringOption('description');
+      if (typeof description !== 'string') {
+        await ctx.reply('Please provide a newsletter description.');
+        return;
+      }
+
+      try {
+        await updateDescription(jid, description.trim());
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to update newsletter description');
+        await ctx.reply(`Failed to update description for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+      await ctx.reply(`Updated description for \`${formatNewsletterJidForReply(jid)}\`.`);
     },
   },
   newslettermessages: {
@@ -1653,6 +1859,98 @@ const commandHandlers = {
       await ctx.replyPartitioned(lines.join('\n'));
     },
   },
+  newsletterreact: {
+    description: 'React/unreact to a newsletter message.',
+    options: [
+      {
+        name: 'serverid',
+        description: 'Target newsletter server message ID.',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: true,
+      },
+      {
+        name: 'reaction',
+        description: 'Emoji reaction code (omit to remove reaction).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const reactMessage = await requireNewsletterMethod(ctx, 'newsletterReactMessage');
+      if (!reactMessage) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      const serverId = ctx.getStringOption('serverid')?.trim();
+      if (!serverId) {
+        await ctx.reply('Please provide `serverid`.');
+        return;
+      }
+      const reactionRaw = ctx.getStringOption('reaction');
+      const reaction = reactionRaw?.trim() || undefined;
+
+      try {
+        await reactMessage(jid, serverId, reaction);
+      } catch (err) {
+        state.logger?.error({ err, jid, serverId, reaction }, 'Failed to react to newsletter message');
+        await ctx.reply(`Failed to apply reaction for \`${formatNewsletterJidForReply(jid)}\` message \`${serverId}\`.`);
+        return;
+      }
+
+      if (reaction) {
+        await ctx.reply(`Applied reaction to \`${formatNewsletterJidForReply(jid)}\` message \`${serverId}\`.`);
+        return;
+      }
+      await ctx.reply(`Removed reaction from \`${formatNewsletterJidForReply(jid)}\` message \`${serverId}\`.`);
+    },
+  },
+  newslettersubscribeupdates: {
+    description: 'Subscribe to newsletter live updates.',
+    options: [
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const subscribeUpdates = await requireNewsletterMethod(ctx, 'subscribeNewsletterUpdates');
+      if (!subscribeUpdates) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      let result;
+      try {
+        result = await subscribeUpdates(jid);
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to subscribe to newsletter updates');
+        await ctx.reply(`Failed to subscribe to updates for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+
+      const duration = result?.duration;
+      if (duration) {
+        await ctx.reply(`Subscribed to live updates for \`${formatNewsletterJidForReply(jid)}\` (duration=${duration}).`);
+        return;
+      }
+      await ctx.reply(`Subscribed to live updates for \`${formatNewsletterJidForReply(jid)}\`.`);
+    },
+  },
   newslettermetadata: {
     description: 'Fetch newsletter metadata.',
     options: [
@@ -1703,6 +2001,92 @@ const commandHandlers = {
       }
       lines.push('', 'Raw metadata:', `\`\`\`json\n${formatJsonForReply(metadata)}\n\`\`\``);
       await ctx.replyPartitioned(lines.join('\n'));
+    },
+  },
+  newsletterchangeowner: {
+    description: 'Change newsletter owner.',
+    options: [
+      {
+        name: 'user',
+        description: 'New owner WhatsApp JID/number.',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: true,
+      },
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const changeOwner = await requireNewsletterMethod(ctx, 'newsletterChangeOwner');
+      if (!changeOwner) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+      const newOwnerJid = await resolveUserJidOption(ctx, {
+        optionName: 'user',
+        description: 'the new owner',
+      });
+      if (!newOwnerJid) {
+        return;
+      }
+
+      try {
+        await changeOwner(jid, newOwnerJid);
+      } catch (err) {
+        state.logger?.error({ err, jid, newOwnerJid }, 'Failed to change newsletter owner');
+        await ctx.reply(`Failed to change owner for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+      await ctx.reply(`Changed owner for \`${formatNewsletterJidForReply(jid)}\` to \`${formatNewsletterJidForReply(newOwnerJid)}\`.`);
+    },
+  },
+  newsletterdemote: {
+    description: 'Demote a newsletter admin.',
+    options: [
+      {
+        name: 'user',
+        description: 'Admin WhatsApp JID/number to demote.',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: true,
+      },
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const demoteUser = await requireNewsletterMethod(ctx, 'newsletterDemote');
+      if (!demoteUser) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+      const userJid = await resolveUserJidOption(ctx, {
+        optionName: 'user',
+        description: 'the user to demote',
+      });
+      if (!userJid) {
+        return;
+      }
+
+      try {
+        await demoteUser(jid, userJid);
+      } catch (err) {
+        state.logger?.error({ err, jid, userJid }, 'Failed to demote newsletter user');
+        await ctx.reply(`Failed to demote \`${formatNewsletterJidForReply(userJid)}\` for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+      await ctx.reply(`Demoted \`${formatNewsletterJidForReply(userJid)}\` for \`${formatNewsletterJidForReply(jid)}\`.`);
     },
   },
   newsletterdelete: {
