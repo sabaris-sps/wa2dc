@@ -97,3 +97,8 @@ The setup is short, but challenging for some. So, we explained every step in det
 ## Commands
 
 The bot supports many commands to allow rich customization. You can see the commands by [clicking here.](commands.md)
+
+## Developer docs
+
+For contributors, the engineering knowledge base lives in [`docs/dev/`](dev/README.md).
+`AGENTS.md` is intentionally brief and acts as a map into that directory.
