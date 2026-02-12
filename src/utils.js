@@ -565,8 +565,6 @@ const sanitizePathSegment = (name = '', fallback = 'file') => {
     .trim();
   const base = path.basename(raw);
   let normalized = base.replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').slice(0, 128);
-
-
   normalized = normalized.replace(/[. ]+$/g, '');
   const parsed = path.parse(normalized);
   if (parsed.name && isWindowsReservedBasename(parsed.name)) {
@@ -1051,15 +1049,12 @@ function stopDownloadServer() {
   }
 }
 
-
 const updater = {
   isNode: process.argv0.replace('.exe', '').endsWith('node'),
 
   currentExeName: process.argv0.split(/[/\\]/).pop(),
 
   get supportsSignedSelfUpdate() {
-
-
     return true;
   },
 
@@ -2879,8 +2874,6 @@ const whatsapp = {
         if (formatted) mentions.add(formatted);
       }
     }
-
-
     const phoneMentionRegex = /@(\+?\d{7,15})(?=\W|$)/g;
     let match;
     while ((match = phoneMentionRegex.exec(cleaned)) !== null) {
@@ -2913,8 +2906,6 @@ const whatsapp = {
     if (!formatted) return null;
 
     const store = state.waClient?.signalRepository?.lidMapping;
-
-
     if (this.isPhoneJid(formatted)) return formatted;
     if (this.isLidJid(formatted) && store && typeof store.getPNForLID === 'function') {
       try {
@@ -3253,8 +3244,6 @@ const whatsapp = {
       };
     } catch (err) {
       if (err?.message?.includes('Unrecognised filter type') || err?.message?.includes('Unrecognized filter type')) {
-
-
         state.logger?.warn('Skipped sending attachment due to an invalid PNG file');
       } else {
         state.logger?.error(err);
@@ -3422,9 +3411,6 @@ const whatsapp = {
       const found = tryLookup(resolvedCandidate) || tryLookup(primary) || tryLookup(alternate);
       const jids = [formatted, primary, alternate, resolved].filter(Boolean);
       if (found) return { discordUserId: found.discordUserId, jids: [...jids, ...found.keys] };
-
-
-
       const mentionName = getStoredContactName(formatted)
         || getStoredContactName(resolvedCandidate)
         || getStoredContactName(primary)

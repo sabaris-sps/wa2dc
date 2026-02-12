@@ -1086,8 +1086,6 @@ test('Discord broadcast/crosspost webhooks require redirectannouncements when re
 
     const discordHandler = await importDiscordHandler('broadcast-webhook-forward');
     state.dcClient = await discordHandler.start();
-
-
     fakeClient.emit('messageCreate', {
       id: 'bridge-webhook-msg',
       author: { id: 'bot-3', bot: true },
@@ -1099,8 +1097,6 @@ test('Discord broadcast/crosspost webhooks require redirectannouncements when re
     });
     await delay(0);
     assert.equal(waEvents.length, 0);
-
-
     fakeClient.emit('messageCreate', {
       id: 'external-webhook-msg',
       author: { id: 'bot-4', bot: true },
@@ -1112,8 +1108,6 @@ test('Discord broadcast/crosspost webhooks require redirectannouncements when re
     });
     await delay(0);
     assert.equal(waEvents.length, 0);
-
-
     state.settings.redirectAnnouncementWebhooks = true;
     fakeClient.emit('messageCreate', {
       id: 'external-webhook-msg-2',

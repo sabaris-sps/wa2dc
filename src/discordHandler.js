@@ -1140,8 +1140,6 @@ const commandHandlers = {
         await ctx.reply('Please enter a phone number or name. Usage: `start <number with country code or name>`.');
         return;
       }
-
-
       const jid = utils.whatsapp.toJid(contact);
       if (!jid) {
         await ctx.reply(`Couldn't find \`${contact}\`.`);

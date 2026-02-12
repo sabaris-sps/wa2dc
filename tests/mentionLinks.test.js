@@ -245,8 +245,6 @@ test('Linked mentions resolve for LID mentions without mapping when the stored c
       user: { id: '0@s.whatsapp.net' },
       signalRepository: { lidMapping: {} },
     };
-
-
     state.contacts[pnJid] = 'Alice';
     state.contacts[lidJid] = 'Alice';
     state.settings.WhatsAppDiscordMentionLinks = { [pnJid]: discordUserId };

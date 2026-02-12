@@ -18,8 +18,6 @@ import messageStore from './messageStore.js';
 import { createGroupRefreshScheduler } from './groupMetadataRefresh.js';
 import { getPollEncKey, getPollOptions } from './pollUtils.js';
 import { oneWayAllowsDiscordToWhatsApp } from './oneWay.js';
-
-
 let authState;
 let saveState;
 let groupCachePruneInterval = null;
@@ -529,12 +527,8 @@ const ensureSignalStoreSupport = async (keyStore) => {
     const requiredKeys = ['tctoken', 'lid-mapping', 'device-list', 'device-index'];
     for (const key of requiredKeys) {
         try {
-
-
-
             const existing = await keyStore.get(key, []);
             if (existing == null) {
-
                 await keyStore.set({ [key]: {} });
             }
         } catch (err) {
