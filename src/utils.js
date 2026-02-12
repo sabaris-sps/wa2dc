@@ -2952,8 +2952,9 @@ const whatsapp = {
       )
         ? linkedContactName
         : (normalizedDisplayTokens[0] || null);
-      const replacementLabel = preferredDisplayName
-        || (this.isPhoneJid(mentionJid) ? this.jidToPhone(mentionJid) : this.jidToName(mentionJid));
+      const replacementLabel = this.isPhoneJid(mentionJid)
+        ? this.jidToPhone(mentionJid)
+        : (preferredDisplayName || this.jidToName(mentionJid));
       const replacementToken = `@${String(replacementLabel || '').replace(/^@+/, '')}`;
 
       let replaced = false;

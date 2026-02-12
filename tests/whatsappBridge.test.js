@@ -491,8 +491,8 @@ test('Discord embeds can be mirrored to WhatsApp with mention conversion', async
     assert.equal(harness.fakeClient.sendCalls.length, 1);
     const mirrored = harness.fakeClient.sendCalls[0]?.content?.text || '';
     assert.ok(mirrored.includes('Embed Title'));
-    assert.ok(mirrored.includes('Hi @Panos and @Moderators'));
-    assert.ok(mirrored.includes('Scope: @Panos'));
+    assert.ok(mirrored.includes('Hi @14155550123 and @Moderators'));
+    assert.ok(mirrored.includes('Scope: @14155550123'));
     assert.ok(mirrored.includes('https://example.com/embed'));
     assert.deepEqual(harness.fakeClient.sendCalls[0]?.content?.mentions, [linkedJid]);
   } finally {
@@ -681,7 +681,7 @@ test('Discord forwarded snapshots resolve user and role mentions from raw tokens
     await delay(0);
 
     assert.equal(harness.fakeClient.sendCalls.length, 1);
-    assert.equal(harness.fakeClient.sendCalls[0]?.content?.text, 'Forwarded\nHi @Panos and @Moderators');
+    assert.equal(harness.fakeClient.sendCalls[0]?.content?.text, 'Forwarded\nHi @14155550123 and @Moderators');
     assert.deepEqual(harness.fakeClient.sendCalls[0]?.content?.mentions, [linkedJid]);
   } finally {
     state.settings.WhatsAppDiscordMentionLinks = originalMentionLinks;

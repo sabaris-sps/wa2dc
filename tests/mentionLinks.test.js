@@ -287,7 +287,7 @@ test('Discord user mentions can be converted to WhatsApp mentions via mention li
       { discordUserId, displayTokens: ['Bob'] },
     ]);
 
-    assert.equal(result.text, 'Hi @Alice');
+    assert.equal(result.text, 'Hi @14155550123');
     assert.deepEqual(result.mentionJids, [pnJid]);
   } finally {
     state.waClient = originalWaClient;
@@ -339,7 +339,7 @@ test('Discord mention replacement matches before punctuation/symbol boundaries',
       { discordUserId, displayTokens: ['Bob'] },
     ]);
 
-    assert.equal(result.text, 'Hi @Alice, @Alice! @Alice🙂 @Bobby');
+    assert.equal(result.text, 'Hi @14155550123, @14155550123! @14155550123🙂 @Bobby');
     assert.deepEqual(result.mentionJids, [pnJid]);
   } finally {
     state.waClient = originalWaClient;
@@ -415,7 +415,7 @@ test('Discord mentions prefer PN JIDs when both PN and LID links exist', async (
       },
     ], { chatJid: '123456789@g.us' });
 
-    assert.equal(result.text, 'Hi @Alice');
+    assert.equal(result.text, 'Hi @14155550123');
     assert.deepEqual(result.mentionJids, [pnJid]);
   } finally {
     state.waClient = originalWaClient;
