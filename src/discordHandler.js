@@ -2601,8 +2601,12 @@ const commandHandlers = {
       await utils.discord.syncUpdatePrompt();
       await utils.discord.syncRollbackPrompt();
       if (state.updateInfo) {
-        const message = utils.updater.formatUpdateMessage(state.updateInfo);
-        await ctx.replyPartitioned(message);
+        if (ctx.isControlChannel) {
+          await ctx.reply('Update available. The persistent update prompt in this channel has been refreshed.');
+        } else {
+          const message = utils.updater.formatUpdateMessage(state.updateInfo);
+          await ctx.replyPartitioned(message);
+        }
       } else {
         await ctx.reply('No updates are available on that channel right now.');
       }
@@ -2650,21 +2654,25 @@ const commandHandlers = {
       await utils.discord.syncUpdatePrompt();
       await utils.discord.syncRollbackPrompt();
       if (state.updateInfo) {
-        const message = utils.updater.formatUpdateMessage(state.updateInfo);
-        const components = [
-          new MessageActionRow().addComponents(
-            new MessageButton()
-              .setCustomId(UPDATE_BUTTON_IDS.APPLY)
-              .setLabel('Update')
-              .setStyle('PRIMARY')
-              .setDisabled(!state.updateInfo.canSelfUpdate),
-            new MessageButton()
-              .setCustomId(UPDATE_BUTTON_IDS.SKIP)
-              .setLabel('Skip update')
-              .setStyle('SECONDARY'),
-          ),
-        ];
-        await ctx.reply({ content: message, components });
+        if (ctx.isControlChannel) {
+          await ctx.reply('Update available. The persistent update prompt in this channel has been refreshed.');
+        } else {
+          const message = utils.updater.formatUpdateMessage(state.updateInfo);
+          const components = [
+            new MessageActionRow().addComponents(
+              new MessageButton()
+                .setCustomId(UPDATE_BUTTON_IDS.APPLY)
+                .setLabel('Update')
+                .setStyle('PRIMARY')
+                .setDisabled(!state.updateInfo.canSelfUpdate),
+              new MessageButton()
+                .setCustomId(UPDATE_BUTTON_IDS.SKIP)
+                .setLabel('Skip update')
+                .setStyle('SECONDARY'),
+            ),
+          ];
+          await ctx.reply({ content: message, components });
+        }
       } else {
         await ctx.reply('No update available.');
       }
