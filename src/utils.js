@@ -28,12 +28,30 @@ const CUSTOM_EMOJI_REGEX = /<(a?):([a-zA-Z0-9_]{1,32}):(\d+)>/g;
 const GIF_URL_EXTENSION_REGEX = /\.(gif|mp4|webm)$/i;
 const GIF_PROVIDER_HINTS = ['tenor', 'giphy', 'imgur', 'gyazo'];
 const isKnownGifProvider = (value = '') => GIF_PROVIDER_HINTS.some((hint) => value.includes(hint));
+const UNKNOWN_DISPLAY_NAME = 'Unknown';
+const SELF_DISPLAY_NAME = 'You';
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const buildUnicodeMentionRegex = (token) => new RegExp(
   `@${escapeRegex(token)}(?=$|\\s|[\\p{P}\\p{S}])`,
   'giu',
 );
 const buildWordBoundaryMentionRegex = (token) => new RegExp(`@${escapeRegex(token)}(?=\\W|$)`, 'g');
+const isUnknownDisplayName = (value = '') => (
+  String(value).trim().toLowerCase() === UNKNOWN_DISPLAY_NAME.toLowerCase()
+);
+const isUnknownOrSelfDisplayName = (value = '') => {
+  const normalized = String(value).trim().toLowerCase();
+  return (
+    normalized === UNKNOWN_DISPLAY_NAME.toLowerCase()
+    || normalized === SELF_DISPLAY_NAME.toLowerCase()
+  );
+};
+const normalizeDiscordUserId = (value, { coerce = false } = {}) => {
+  const rawValue = typeof value === 'string' ? value : (coerce ? String(value || '') : '');
+  const trimmed = rawValue.trim();
+  if (!trimmed) return null;
+  return /^\d+$/.test(trimmed) ? trimmed : null;
+};
 const MIME_BY_EXTENSION = {
   gif: 'image/gif',
   jpg: 'image/jpeg',
@@ -2877,8 +2895,8 @@ const whatsapp = {
   getLinkedJidsForDiscordUserId(discordUserId) {
     const links = state.settings?.WhatsAppDiscordMentionLinks;
     if (!links || typeof links !== 'object' || Array.isArray(links)) return [];
-    const normalizedId = typeof discordUserId === 'string' ? discordUserId.trim() : String(discordUserId || '').trim();
-    if (!/^\d+$/.test(normalizedId)) return [];
+    const normalizedId = normalizeDiscordUserId(discordUserId, { coerce: true });
+    if (!normalizedId) return [];
 
     const results = new Set();
     for (const [jidRaw, discordIdRaw] of Object.entries(links)) {
@@ -2889,7 +2907,8 @@ const whatsapp = {
     }
     return [...results];
   },
-  async preferMentionJidForChat(mentionJid) {
+  async preferMentionJidForChat(mentionJid, chatJid = null) {
+    void chatJid;
     const formatted = this.formatJid(mentionJid);
     if (!formatted) return null;
 
@@ -2937,7 +2956,7 @@ const whatsapp = {
       const linkedContactName = this.jidToName(mentionJid);
       const preferredDisplayName = (
         linkedContactName
-        && linkedContactName !== 'Unknown'
+        && !isUnknownDisplayName(linkedContactName)
         && !this.isPhoneLike(linkedContactName)
       )
         ? linkedContactName
@@ -3344,13 +3363,6 @@ const whatsapp = {
     const links = state.settings?.WhatsAppDiscordMentionLinks;
     const hasLinks = links && typeof links === 'object';
 
-    const normalizeDiscordUserId = (value) => {
-      if (typeof value !== 'string') return null;
-      const trimmed = value.trim();
-      if (!trimmed) return null;
-      return /^\d+$/.test(trimmed) ? trimmed : null;
-    };
-
     const resolveLinkedDiscordUserId = async (jid) => {
       if (!hasLinks) return null;
       const formatted = this.formatJid(jid);
@@ -3372,7 +3384,7 @@ const whatsapp = {
         const stored = state.contacts?.[normalized] || state.waClient?.contacts?.[normalized];
         const normalizedName = normalizeNameForMatch(stored);
         if (!normalizedName) return null;
-        if (normalizedName === 'unknown' || normalizedName === 'you') return null;
+        if (isUnknownOrSelfDisplayName(normalizedName)) return null;
         if (/^\d+$/.test(normalizedName)) return null;
         return normalizedName;
       };
@@ -3441,7 +3453,7 @@ const whatsapp = {
     const normalizeMentionName = (value, { allowPhone = true } = {}) => {
       if (typeof value !== 'string') return null;
       const trimmed = value.trim();
-      if (!trimmed || trimmed === 'Unknown' || trimmed === 'You') return null;
+      if (!trimmed || isUnknownOrSelfDisplayName(trimmed)) return null;
       if (!allowPhone && this.isPhoneLike(trimmed)) return null;
       return trimmed;
     };
@@ -3481,7 +3493,7 @@ const whatsapp = {
       }
 
       const phoneFallback = normalizedCandidates.map((candidate) => this.jidToPhone(candidate)).find(Boolean);
-      return phoneFallback || 'Unknown';
+      return phoneFallback || UNKNOWN_DISPLAY_NAME;
     };
 
     const trailingMentions = new Set();
@@ -3523,7 +3535,7 @@ const whatsapp = {
       }
       if (typeof nameToken === 'string') {
         const trimmed = nameToken.trim();
-        if (trimmed && trimmed !== 'Unknown' && trimmed !== 'You') mentionTextCandidates.add(trimmed);
+        if (trimmed && !isUnknownOrSelfDisplayName(trimmed)) mentionTextCandidates.add(trimmed);
       }
 
       let replaced = false;

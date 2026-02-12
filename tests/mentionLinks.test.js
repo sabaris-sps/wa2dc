@@ -318,6 +318,76 @@ test('Outgoing mention parsing supports phone-number tokens', async () => {
   }
 });
 
+test('Discord mention replacement matches before punctuation/symbol boundaries', async () => {
+  const originalWaClient = state.waClient;
+  const originalContacts = snapshotObject(state.contacts);
+  const originalLinks = snapshotObject(state.settings.WhatsAppDiscordMentionLinks);
+
+  try {
+    restoreObject(state.contacts, {});
+    state.waClient = {
+      contacts: state.contacts,
+      user: { id: '0@s.whatsapp.net' },
+      signalRepository: { lidMapping: {} },
+    };
+
+    const pnJid = '14155550123@s.whatsapp.net';
+    const discordUserId = '123456789012345678';
+    state.contacts[pnJid] = 'Alice';
+    state.settings.WhatsAppDiscordMentionLinks = { [pnJid]: discordUserId };
+
+    const input = 'Hi @Bob, @Bob! @Bob🙂 @Bobby';
+    const result = await utils.whatsapp.applyDiscordMentionLinks(input, [
+      { discordUserId, displayTokens: ['Bob'] },
+    ]);
+
+    assert.equal(result.text, 'Hi @Alice, @Alice! @Alice🙂 @Bobby');
+    assert.deepEqual(result.mentionJids, [pnJid]);
+  } finally {
+    state.waClient = originalWaClient;
+    restoreObject(state.contacts, originalContacts);
+    state.settings.WhatsAppDiscordMentionLinks = originalLinks;
+  }
+});
+
+test('WhatsApp mention replacement keeps alphanumeric suffix tokens untouched', async () => {
+  const originalWaClient = state.waClient;
+  const originalContacts = snapshotObject(state.contacts);
+  const originalLinks = snapshotObject(state.settings.WhatsAppDiscordMentionLinks);
+
+  try {
+    restoreObject(state.contacts, {});
+    state.waClient = {
+      contacts: state.contacts,
+      user: { id: '0@s.whatsapp.net' },
+      signalRepository: { lidMapping: {} },
+    };
+
+    const pnJid = '14155550123@s.whatsapp.net';
+    const discordUserId = '123456789012345678';
+    state.contacts[pnJid] = 'Alice';
+    state.settings.WhatsAppDiscordMentionLinks = { [pnJid]: discordUserId };
+
+    const msg = {
+      text: 'Hi @14155550123, @14155550123! and @14155550123abc',
+      contextInfo: { mentionedJid: [pnJid] },
+    };
+
+    const result = await utils.whatsapp.getContent(
+      msg,
+      'extendedTextMessage',
+      'extendedTextMessage',
+      { mentionTarget: 'discord' },
+    );
+    assert.equal(result.content, `Hi <@${discordUserId}>, <@${discordUserId}>! and @14155550123abc`);
+    assert.deepEqual(result.discordMentions, [discordUserId]);
+  } finally {
+    state.waClient = originalWaClient;
+    restoreObject(state.contacts, originalContacts);
+    state.settings.WhatsAppDiscordMentionLinks = originalLinks;
+  }
+});
+
 test('Discord mentions prefer PN JIDs when both PN and LID links exist', async () => {
   const originalWaClient = state.waClient;
   const originalContacts = snapshotObject(state.contacts);
