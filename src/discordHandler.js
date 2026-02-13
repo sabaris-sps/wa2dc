@@ -1,6 +1,6 @@
 import discordJs from 'discord.js';
 import fs from 'fs';
-import { getDevice } from '@whiskeysockets/baileys';
+import * as baileys from '@whiskeysockets/baileys';
 
 import state from './state.js';
 import utils from './utils.js';
@@ -16,6 +16,7 @@ import {
 } from './oneWay.js';
 
 const { Intents, Constants, MessageActionRow, MessageButton } = discordJs;
+const { getDevice } = baileys;
 
 const DEFAULT_AVATAR_URL = 'https://cdn.discordapp.com/embed/avatars/0.png';
 const PIN_DURATION_PRESETS = {
@@ -1132,6 +1133,149 @@ client.on('whatsappPin', async ({ jid, key, pinned }) => {
 
 const { ApplicationCommandOptionTypes } = Constants;
 const isNewsletterJid = (jid = '') => typeof jid === 'string' && jid.endsWith('@newsletter');
+const NEWSLETTER_CREATE_QUERY_ID = baileys.QueryIds?.CREATE || '8823471724422422';
+const NEWSLETTER_CREATE_DATA_PATH = baileys.XWAPaths?.xwa2_newsletter_create || 'xwa2_newsletter_create';
+const WMEX_SERVER_JID = baileys.S_WHATSAPP_NET || 's.whatsapp.net';
+
+const parseNewsletterTextValue = (value) => {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value && typeof value === 'object' && typeof value.text === 'string') {
+    return value.text;
+  }
+  return undefined;
+};
+
+const toFiniteInteger = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const normalizeNewsletterCreateResult = (
+  rawResult,
+  { fallbackName = '', fallbackDescription = '' } = {},
+) => {
+  const result = rawResult && typeof rawResult === 'object'
+    ? (rawResult.result && typeof rawResult.result === 'object' ? rawResult.result : rawResult)
+    : {};
+  const thread = result.thread_metadata && typeof result.thread_metadata === 'object'
+    ? result.thread_metadata
+    : {};
+  const viewer = result.viewer_metadata && typeof result.viewer_metadata === 'object'
+    ? result.viewer_metadata
+    : {};
+  const name = parseNewsletterTextValue(thread.name)
+    || parseNewsletterTextValue(result.name)
+    || fallbackName;
+  const description = parseNewsletterTextValue(thread.description)
+    ?? parseNewsletterTextValue(result.description)
+    ?? (fallbackDescription || undefined);
+  const pictureRaw = thread.picture && typeof thread.picture === 'object' ? thread.picture : null;
+  const picture = pictureRaw
+    ? {
+      ...(typeof pictureRaw.id === 'string' ? { id: pictureRaw.id } : {}),
+      ...(typeof pictureRaw.direct_path === 'string' ? { directPath: pictureRaw.direct_path } : {}),
+    }
+    : undefined;
+
+  return {
+    ...result,
+    ...(name ? { name } : {}),
+    ...(typeof description === 'string' ? { description } : {}),
+    ...(typeof thread.creation_time !== 'undefined'
+      ? { creation_time: toFiniteInteger(thread.creation_time) }
+      : {}),
+    ...(typeof thread.subscribers_count !== 'undefined'
+      ? { subscribers: toFiniteInteger(thread.subscribers_count) }
+      : {}),
+    ...(typeof thread.invite === 'string' ? { invite: thread.invite } : {}),
+    ...(typeof thread.verification === 'string' ? { verification: thread.verification } : {}),
+    ...(picture && Object.keys(picture).length ? { picture } : {}),
+    ...(typeof viewer.mute === 'string' ? { mute_state: viewer.mute } : {}),
+    ...(Object.keys(thread).length ? { thread_metadata: thread, threadMetadata: thread } : {}),
+    ...(Object.keys(viewer).length ? { viewer_metadata: viewer, viewerMetadata: viewer } : {}),
+  };
+};
+
+const executeWMexQueryCompat = async (waClient, variables, queryId, dataPath) => {
+  if (typeof waClient?.query !== 'function' || typeof waClient?.generateMessageTag !== 'function') {
+    throw new Error('Raw w:mex query is unavailable on this WhatsApp client.');
+  }
+  const resultNode = await waClient.query({
+    tag: 'iq',
+    attrs: {
+      id: waClient.generateMessageTag(),
+      type: 'get',
+      to: WMEX_SERVER_JID,
+      xmlns: 'w:mex',
+    },
+    content: [
+      {
+        tag: 'query',
+        attrs: { query_id: queryId },
+        content: Buffer.from(JSON.stringify({ variables }), 'utf-8'),
+      },
+    ],
+  });
+  const child = typeof baileys.getBinaryNodeChild === 'function'
+    ? baileys.getBinaryNodeChild(resultNode, 'result')
+    : (Array.isArray(resultNode?.content)
+      ? resultNode.content.find((entry) => entry?.tag === 'result')
+      : null);
+  const rawPayload = child?.content;
+  if (typeof rawPayload === 'undefined') {
+    throw new Error('Failed to run newsletter create query: missing result payload.');
+  }
+  const payloadBuffer = Buffer.isBuffer(rawPayload)
+    ? rawPayload
+    : (rawPayload instanceof Uint8Array
+      ? Buffer.from(rawPayload)
+      : Buffer.from(String(rawPayload), 'utf-8'));
+  let payload;
+  try {
+    payload = JSON.parse(payloadBuffer.toString());
+  } catch (err) {
+    throw new Error('Failed to parse newsletter create query payload.', { cause: err });
+  }
+
+  const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+  if (errors.length > 0) {
+    const errorMessages = errors
+      .map((entry) => entry?.message || 'Unknown error')
+      .join(', ');
+    throw new Error(`GraphQL server error: ${errorMessages || 'Unknown error'}`);
+  }
+
+  const response = dataPath ? payload?.data?.[dataPath] : payload?.data;
+  if (typeof response === 'undefined') {
+    throw new Error('Failed to run newsletter create query: unexpected response structure.');
+  }
+  return response;
+};
+
+const createNewsletterCompat = async (createNewsletter, name, description) => {
+  const hasRawQuerySupport = typeof state.waClient?.query === 'function'
+    && typeof state.waClient?.generateMessageTag === 'function';
+  if (!hasRawQuerySupport) {
+    return createNewsletter(name, description);
+  }
+  const rawResponse = await executeWMexQueryCompat(
+    state.waClient,
+    {
+      input: {
+        name,
+        description: description || null,
+      },
+    },
+    NEWSLETTER_CREATE_QUERY_ID,
+    NEWSLETTER_CREATE_DATA_PATH,
+  );
+  return normalizeNewsletterCreateResult(rawResponse, {
+    fallbackName: name,
+    fallbackDescription: description,
+  });
+};
 
 const formatJsonForReply = (value) => {
   try {
@@ -1331,7 +1475,7 @@ const commandHandlers = {
 
       let result;
       try {
-        result = await createNewsletter(name, description);
+        result = await createNewsletterCompat(createNewsletter, name, description);
       } catch (err) {
         state.logger?.error({ err }, 'Failed to create newsletter');
         await ctx.reply('Failed to create the newsletter. Please check logs and try again.');

@@ -14,7 +14,21 @@ const importDiscordHandler = async (tag) => (
   (await import(`../src/discordHandler.js?test=${encodeURIComponent(tag)}`)).default
 );
 
-const createInteraction = ({ channelId, commandName = 'checkupdate' }) => {
+const restoreObject = (target, snapshot) => {
+  Object.keys(target).forEach((key) => { delete target[key]; });
+  Object.assign(target, snapshot);
+};
+
+const createInteraction = ({
+  channelId,
+  commandName = 'checkupdate',
+  stringOptions = {},
+  booleanOptions = {},
+  integerOptions = {},
+  numberOptions = {},
+  channelOptions = {},
+  userOptions = {},
+}) => {
   const records = {
     deferReply: [],
     editReply: [],
@@ -26,12 +40,12 @@ const createInteraction = ({ channelId, commandName = 'checkupdate' }) => {
     channel: { id: channelId },
     commandName,
     options: {
-      getString: () => null,
-      getBoolean: () => null,
-      getInteger: () => null,
-      getNumber: () => null,
-      getChannel: () => null,
-      getUser: () => null,
+      getString: (name) => (name in stringOptions ? stringOptions[name] : null),
+      getBoolean: (name) => (name in booleanOptions ? booleanOptions[name] : null),
+      getInteger: (name) => (name in integerOptions ? integerOptions[name] : null),
+      getNumber: (name) => (name in numberOptions ? numberOptions[name] : null),
+      getChannel: (name) => (name in channelOptions ? channelOptions[name] : null),
+      getUser: (name) => (name in userOptions ? userOptions[name] : null),
     },
     isButton: () => false,
     isCommand: () => true,
@@ -223,6 +237,123 @@ test('/checkupdate outside control channel still returns full update details', a
     state.settings.ControlChannelID = originalSettings.ControlChannelID;
     state.updateInfo = originalUpdateInfo;
     state.dcClient = originalDcClient;
+    resetClientFactoryOverrides();
+  }
+});
+
+test('/newslettercreate succeeds when create response has null picture metadata', async () => {
+  const originalDiscordUtils = {
+    getGuild: utils.discord.getGuild,
+    getControlChannel: utils.discord.getControlChannel,
+    getOrCreateChannel: utils.discord.getOrCreateChannel,
+  };
+  const originalSettings = {
+    Token: state.settings.Token,
+    GuildID: state.settings.GuildID,
+    ControlChannelID: state.settings.ControlChannelID,
+    Whitelist: state.settings.Whitelist,
+  };
+  const originalDcClient = state.dcClient;
+  const originalWaClient = state.waClient;
+  const originalContacts = { ...state.contacts };
+
+  try {
+    state.settings.Token = 'TEST_TOKEN';
+    state.settings.GuildID = 'guild';
+    state.settings.ControlChannelID = 'control';
+    state.settings.Whitelist = [];
+    restoreObject(state.contacts, {});
+
+    utils.discord.getGuild = async () => ({ commands: { set: async () => {} } });
+    utils.discord.getControlChannel = async () => ({ send: async () => {} });
+
+    const linkedJids = [];
+    utils.discord.getOrCreateChannel = async (jid) => {
+      linkedJids.push(jid);
+      return { channelId: 'news-channel' };
+    };
+
+    let newsletterCreateCalls = 0;
+    let rawQueryCalls = 0;
+    state.waClient = {
+      contacts: {},
+      async newsletterCreate() {
+        newsletterCreateCalls += 1;
+        throw new Error('Expected raw WMex compatibility path instead of newsletterCreate()');
+      },
+      generateMessageTag() {
+        return 'wmex-tag-1';
+      },
+      async query() {
+        rawQueryCalls += 1;
+        return {
+          tag: 'iq',
+          attrs: {},
+          content: [{
+            tag: 'result',
+            attrs: {},
+            content: Buffer.from(JSON.stringify({
+              data: {
+                xwa2_newsletter_create: {
+                  id: '120363123456789012@newsletter',
+                  thread_metadata: {
+                    creation_time: '1730000000',
+                    description: { text: 'Bridge test newsletter' },
+                    invite: 'https://whatsapp.com/channel/test',
+                    name: { text: 'Bridge Test' },
+                    picture: null,
+                    subscribers_count: '0',
+                    verification: 'UNVERIFIED',
+                  },
+                  viewer_metadata: { mute: 'OFF' },
+                },
+              },
+            }), 'utf-8'),
+          }],
+        };
+      },
+    };
+
+    const fakeClient = new FakeDiscordClient();
+    setClientFactoryOverrides({ createDiscordClient: () => fakeClient });
+    const discordHandler = await importDiscordHandler('newslettercreate-null-picture');
+    state.dcClient = await discordHandler.start();
+    await delay(0);
+
+    const interaction = createInteraction({
+      channelId: 'control',
+      commandName: 'newslettercreate',
+      stringOptions: {
+        name: 'Bridge Test',
+        description: 'Bridge test newsletter',
+      },
+    });
+    fakeClient.emit('interactionCreate', interaction);
+    await delay(0);
+
+    assert.equal(rawQueryCalls, 1);
+    assert.equal(newsletterCreateCalls, 0);
+    assert.deepEqual(linkedJids, ['120363123456789012@newsletter']);
+    assert.equal(state.contacts['120363123456789012@newsletter'], 'Bridge Test');
+    assert.equal(state.waClient.contacts['120363123456789012@newsletter'], 'Bridge Test');
+    assert.equal(interaction.records.editReply.length, 1);
+    assert.equal(
+      interaction.records.editReply[0]?.content,
+      'Created newsletter `120363123456789012@newsletter` and linked it to <#news-channel>.',
+    );
+  } finally {
+    utils.discord.getGuild = originalDiscordUtils.getGuild;
+    utils.discord.getControlChannel = originalDiscordUtils.getControlChannel;
+    utils.discord.getOrCreateChannel = originalDiscordUtils.getOrCreateChannel;
+
+    state.settings.Token = originalSettings.Token;
+    state.settings.GuildID = originalSettings.GuildID;
+    state.settings.ControlChannelID = originalSettings.ControlChannelID;
+    state.settings.Whitelist = originalSettings.Whitelist;
+
+    restoreObject(state.contacts, originalContacts);
+    state.dcClient = originalDcClient;
+    state.waClient = originalWaClient;
     resetClientFactoryOverrides();
   }
 });
