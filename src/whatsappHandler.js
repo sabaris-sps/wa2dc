@@ -17,7 +17,7 @@ import groupMetadataCache from './groupMetadataCache.js';
 import messageStore from './messageStore.js';
 import { createGroupRefreshScheduler } from './groupMetadataRefresh.js';
 import { getPollEncKey, getPollOptions } from './pollUtils.js';
-import { oneWayAllowsDiscordToWhatsApp } from './oneWay.js';
+import { oneWayAllowsDiscordToWhatsApp, oneWayAllowsWhatsAppToDiscord } from './oneWay.js';
 import {
     clearPendingNewsletterSends,
     getNewsletterAckError,
@@ -35,6 +35,7 @@ let authState;
 let saveState;
 let groupCachePruneInterval = null;
 const allowsDiscordToWhatsApp = () => oneWayAllowsDiscordToWhatsApp(state.settings.oneWay);
+const allowsWhatsAppToDiscord = () => oneWayAllowsWhatsAppToDiscord(state.settings.oneWay);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const formatDisconnectReason = (statusCode) => {
     if (typeof statusCode !== 'number') return 'unknown';
@@ -775,6 +776,7 @@ const parseNewsletterLiveUpdateEntries = (node = {}) => {
                 );
                 if (!isLikelyNewsletterServerId(serverId)) continue;
                 const reactionsNode = getNodeChildrenByTag(messageNode, 'reactions')[0];
+                const hasReactionsNode = Boolean(reactionsNode);
                 const reactions = getNodeChildrenByTag(reactionsNode, 'reaction')
                     .map((reactionNode) => ({
                         code: typeof reactionNode?.attrs?.code === 'string'
@@ -787,11 +789,64 @@ const parseNewsletterLiveUpdateEntries = (node = {}) => {
                     serverId,
                     timestamp,
                     reactions,
+                    hasReactionsNode,
                 });
             }
         }
     }
     return results;
+};
+
+const emitNewsletterReactionsFromLiveUpdate = ({ jid, update = {} } = {}) => {
+    const normalizedJid = normalizeSendJid(jid);
+    if (!isNewsletterJid(normalizedJid)) {
+        return 0;
+    }
+    const serverId = normalizeBridgeMessageId(update?.serverId);
+    if (!isLikelyNewsletterServerId(serverId)) {
+        return 0;
+    }
+    if (!allowsWhatsAppToDiscord()) {
+        return 0;
+    }
+    if (!utils.whatsapp.inWhitelist({ key: { remoteJid: normalizedJid } })) {
+        return 0;
+    }
+    if (state.sentReactions.has(serverId)) {
+        state.sentReactions.delete(serverId);
+        return 0;
+    }
+
+    const reactions = Array.isArray(update?.reactions) ? update.reactions : [];
+    let emittedCount = 0;
+
+    for (const reaction of reactions) {
+        const reactionCode = typeof reaction?.code === 'string' ? reaction.code.trim() : '';
+        if (!reactionCode) continue;
+        const reactionCount = toIntegerOrNull(reaction?.count);
+        const removed = reactionCount != null && reactionCount <= 0;
+        state.dcClient.emit('whatsappReaction', {
+            id: serverId,
+            jid: normalizedJid,
+            text: removed ? '' : reactionCode,
+            author: `newsletter:${serverId}:${reactionCode}`,
+        });
+        emittedCount += 1;
+    }
+
+    if (!emittedCount && update?.hasReactionsNode) {
+        // When live_updates includes <reactions/> with no child reactions,
+        // treat it as a clear signal for tracked newsletter reactions.
+        state.dcClient.emit('whatsappReaction', {
+            id: serverId,
+            jid: normalizedJid,
+            text: '',
+            author: `newsletter:${serverId}`,
+        });
+        emittedCount += 1;
+    }
+
+    return emittedCount;
 };
 
 const parseMexNewsletterServerIdCandidates = (node = {}) => {
@@ -2042,6 +2097,7 @@ const connectToWhatsApp = async (retry = 1) => {
             return;
         }
         let mappedCount = 0;
+        let mirroredReactionEvents = 0;
         for (const update of liveUpdates) {
             const mapped = mapPendingNewsletterServerId({
                 jid,
@@ -2052,11 +2108,13 @@ const connectToWhatsApp = async (retry = 1) => {
             if (mapped) {
                 mappedCount += 1;
             }
+            mirroredReactionEvents += emitNewsletterReactionsFromLiveUpdate({ jid, update });
         }
         state.logger?.debug?.({
             jid,
             updates: liveUpdates.length,
             mappedCount,
+            mirroredReactionEvents,
         }, 'Processed newsletter live_updates notification');
     });
 

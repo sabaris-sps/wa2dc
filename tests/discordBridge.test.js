@@ -200,6 +200,104 @@ test('oneWay gating blocks WhatsApp -> Discord forwards in discordHandler', asyn
   }
 });
 
+test('WhatsApp newsletter reactions resolve Discord message via value-side mapping fallback', async () => {
+  const originalDiscordUtils = {
+    getGuild: utils.discord.getGuild,
+    getControlChannel: utils.discord.getControlChannel,
+    getChannel: utils.discord.getChannel,
+  };
+  const originalSettings = {
+    Token: state.settings.Token,
+    GuildID: state.settings.GuildID,
+    oneWay: state.settings.oneWay,
+  };
+  const originalChats = { ...state.chats };
+  const originalReactions = state.reactions;
+  const originalLastMessages = state.lastMessages;
+  const originalDcClient = state.dcClient;
+
+  try {
+    state.settings.Token = 'TEST_TOKEN';
+    state.settings.GuildID = 'guild';
+    state.settings.oneWay = 0b11;
+    state.lastMessages = {
+      'dc-news-1': '137',
+    };
+    state.reactions = {};
+    restoreObject(state.chats, {
+      '120363123456789@newsletter': {
+        channelId: 'chan-news-1',
+      },
+    });
+
+    utils.discord.getGuild = async () => ({ commands: { set: async () => {} } });
+    utils.discord.getControlChannel = async () => ({ send: async () => {} });
+
+    const reacted = [];
+    const fetchedIds = [];
+    const fakeMessage = {
+      reactions: { cache: new Map() },
+      react: async (emoji) => { reacted.push(emoji); },
+    };
+    utils.discord.getChannel = async (channelId) => {
+      assert.equal(channelId, 'chan-news-1');
+      return {
+        id: channelId,
+        messages: {
+          fetch: async (messageId) => {
+            fetchedIds.push(messageId);
+            return fakeMessage;
+          },
+        },
+        send: async () => {},
+      };
+    };
+
+    class FakeDiscordClient extends EventEmitter {
+      constructor() {
+        super();
+        this.user = { id: 'bot-1' };
+      }
+
+      async login() {
+        queueMicrotask(() => this.emit('ready'));
+        return this;
+      }
+    }
+
+    const fakeClient = new FakeDiscordClient();
+    setClientFactoryOverrides({ createDiscordClient: () => fakeClient });
+    const discordHandler = await importDiscordHandler('newsletter-reaction-value-map-fallback');
+    state.dcClient = await discordHandler.start();
+
+    fakeClient.emit('whatsappReaction', {
+      id: '137',
+      jid: '120363123456789@newsletter',
+      text: '👍',
+      author: 'newsletter:137:👍',
+    });
+    await delay(0);
+
+    assert.deepEqual(fetchedIds, ['dc-news-1']);
+    assert.deepEqual(reacted, ['👍']);
+    assert.equal(state.reactions['dc-news-1']?.['newsletter:137:👍'], '👍');
+  } finally {
+    utils.discord.getGuild = originalDiscordUtils.getGuild;
+    utils.discord.getControlChannel = originalDiscordUtils.getControlChannel;
+    utils.discord.getChannel = originalDiscordUtils.getChannel;
+
+    state.settings.Token = originalSettings.Token;
+    state.settings.GuildID = originalSettings.GuildID;
+    state.settings.oneWay = originalSettings.oneWay;
+
+    restoreObject(state.chats, originalChats);
+    state.reactions = originalReactions;
+    state.lastMessages = originalLastMessages;
+    state.dcClient = originalDcClient;
+    resetClientFactoryOverrides();
+  }
+});
+
 test('WhatsApp sender platform suffix appends to mirrored Discord messages', async () => {
   const originalDiscordUtils = {
     getGuild: utils.discord.getGuild,

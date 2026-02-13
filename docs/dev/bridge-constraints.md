@@ -51,4 +51,4 @@ Routing may be restricted by deployment settings. Message-flow changes must pres
   when newsletter media URL sends fail and the source is Discord CDN, retry with a buffer payload before falling back to text/link.
   optional send-side hardening (ack-aware retry paths and quote fallback behavior) can be enabled with `WA2DC_NEWSLETTER_SPECIAL_FLOW=1`.
   Poll sends to newsletters should still try interactive payload first, then fall back to text on send or ack rejection (commonly ack error `479`).
-  Mirror incoming WhatsApp newsletter reactions via `newsletter.reaction` events and key them by `server_id`.
+  Mirror incoming WhatsApp newsletter reactions via `newsletter.reaction` and/or raw `live_updates` notifications, keyed by `server_id`.

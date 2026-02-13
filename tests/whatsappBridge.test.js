@@ -786,6 +786,144 @@ test('Newsletter live_updates notifications map pending outbound ids to server i
   }
 });
 
+test('Newsletter live_updates notifications mirror reactions to Discord', async () => {
+  const harness = await setupWhatsAppHarness({
+    oneWay: 0b11,
+    formatJid: (jid) => (typeof jid === 'string' ? jid.trim() : jid),
+  });
+  try {
+    const nowTs = String(Math.floor(Date.now() / 1000));
+    harness.fakeClient.ws.emit('CB:notification,type:newsletter', {
+      tag: 'notification',
+      attrs: {
+        from: '1203630@newsletter',
+        type: 'newsletter',
+        id: 'test-live-updates-reaction',
+        t: nowTs,
+      },
+      content: [{
+        tag: 'live_updates',
+        attrs: {},
+        content: [{
+          tag: 'messages',
+          attrs: { t: nowTs },
+          content: [{
+            tag: 'message',
+            attrs: { server_id: '133' },
+            content: [{
+              tag: 'reactions',
+              attrs: {},
+              content: [{
+                tag: 'reaction',
+                attrs: { code: '👍', count: '1' },
+              }],
+            }],
+          }],
+        }],
+      }],
+    });
+    await delay(0);
+
+    assert.equal(harness.forwarded.reactions.length, 1);
+    assert.equal(harness.forwarded.reactions[0]?.id, '133');
+    assert.equal(harness.forwarded.reactions[0]?.jid, '1203630@newsletter');
+    assert.equal(harness.forwarded.reactions[0]?.text, '👍');
+    assert.equal(harness.forwarded.reactions[0]?.author, 'newsletter:133:👍');
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('Newsletter live_updates reaction echo suppression uses server_id', async () => {
+  const harness = await setupWhatsAppHarness({
+    oneWay: 0b11,
+    formatJid: (jid) => (typeof jid === 'string' ? jid.trim() : jid),
+  });
+  try {
+    state.sentReactions.add('133');
+    const nowTs = String(Math.floor(Date.now() / 1000));
+    harness.fakeClient.ws.emit('CB:notification,type:newsletter', {
+      tag: 'notification',
+      attrs: {
+        from: '1203630@newsletter',
+        type: 'newsletter',
+        id: 'test-live-updates-reaction-echo',
+        t: nowTs,
+      },
+      content: [{
+        tag: 'live_updates',
+        attrs: {},
+        content: [{
+          tag: 'messages',
+          attrs: { t: nowTs },
+          content: [{
+            tag: 'message',
+            attrs: { server_id: '133' },
+            content: [{
+              tag: 'reactions',
+              attrs: {},
+              content: [{
+                tag: 'reaction',
+                attrs: { code: '👍', count: '1' },
+              }],
+            }],
+          }],
+        }],
+      }],
+    });
+    await delay(0);
+
+    assert.equal(harness.forwarded.reactions.length, 0);
+    assert.equal(state.sentReactions.has('133'), false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('Newsletter live_updates empty reactions clear tracked newsletter reactions', async () => {
+  const harness = await setupWhatsAppHarness({
+    oneWay: 0b11,
+    formatJid: (jid) => (typeof jid === 'string' ? jid.trim() : jid),
+  });
+  try {
+    const nowTs = String(Math.floor(Date.now() / 1000));
+    harness.fakeClient.ws.emit('CB:notification,type:newsletter', {
+      tag: 'notification',
+      attrs: {
+        from: '1203630@newsletter',
+        type: 'newsletter',
+        id: 'test-live-updates-reaction-clear',
+        t: nowTs,
+      },
+      content: [{
+        tag: 'live_updates',
+        attrs: {},
+        content: [{
+          tag: 'messages',
+          attrs: { t: nowTs },
+          content: [{
+            tag: 'message',
+            attrs: { server_id: '133' },
+            content: [{
+              tag: 'reactions',
+              attrs: {},
+            }],
+          }],
+        }],
+      }],
+    });
+    await delay(0);
+
+    assert.equal(harness.forwarded.reactions.length, 1);
+    assert.equal(harness.forwarded.reactions[0]?.id, '133');
+    assert.equal(harness.forwarded.reactions[0]?.jid, '1203630@newsletter');
+    assert.equal(harness.forwarded.reactions[0]?.text, '');
+    assert.equal(harness.forwarded.reactions[0]?.author, 'newsletter:133');
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('Discord to WhatsApp sends include broadcast mode for broadcast chats', async () => {
   const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
   try {

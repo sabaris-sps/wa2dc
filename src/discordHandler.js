@@ -72,6 +72,32 @@ let restartInProgress = false;
 const allowsWhatsAppToDiscord = () => oneWayAllowsWhatsAppToDiscord(state.settings.oneWay);
 const allowsDiscordToWhatsApp = () => oneWayAllowsDiscordToWhatsApp(state.settings.oneWay);
 
+const resolveDiscordMessageIdForWhatsAppId = (whatsAppMessageId) => {
+  const normalizedWaMessageId = normalizeBridgeMessageId(whatsAppMessageId);
+  if (!normalizedWaMessageId) {
+    return null;
+  }
+
+  const direct = normalizeBridgeMessageId(state.lastMessages?.[normalizedWaMessageId]);
+  if (direct && direct !== normalizedWaMessageId && direct !== 'true') {
+    return direct;
+  }
+
+  for (const [keyRaw, valueRaw] of Object.entries(state.lastMessages || {})) {
+    if (normalizeBridgeMessageId(valueRaw) !== normalizedWaMessageId) continue;
+    const candidate = normalizeBridgeMessageId(keyRaw);
+    if (!candidate || candidate === normalizedWaMessageId || candidate === 'true') continue;
+    return candidate;
+  }
+
+  return null;
+};
+
+const resolveChannelIdForJid = (jid) => {
+  const normalizedJid = utils.whatsapp.formatJid(jid);
+  return state.chats?.[normalizedJid]?.channelId || state.chats?.[jid]?.channelId || null;
+};
+
 const requestSafeRestart = async (
   ctx,
   {
@@ -971,40 +997,82 @@ client.on('whatsappMessage', async (message) => {
 
 client.on('whatsappReaction', async (reaction) => {
   if (!allowsWhatsAppToDiscord()) {
+    state.logger?.debug?.({
+      jid: reaction?.jid,
+      id: normalizeBridgeMessageId(reaction?.id),
+      oneWay: state.settings?.oneWay,
+    }, 'Skipping WhatsApp reaction mirror due to one-way settings');
     return;
   }
 
-  const channelId = state.chats[reaction.jid]?.channelId;
-  const messageId = state.lastMessages[reaction.id];
-  if (channelId == null || messageId == null) { return; }
+  const normalizedReactionId = normalizeBridgeMessageId(reaction?.id);
+  const normalizedReactionJid = utils.whatsapp.formatJid(reaction?.jid);
+  const channelId = resolveChannelIdForJid(normalizedReactionJid);
+  const messageId = resolveDiscordMessageIdForWhatsAppId(normalizedReactionId);
+  if (channelId == null || messageId == null) {
+    state.logger?.debug?.({
+      jid: normalizedReactionJid,
+      id: normalizedReactionId,
+      channelId: channelId || null,
+      messageId: messageId || null,
+    }, 'Skipping WhatsApp reaction mirror due to missing channel/message mapping');
+    return;
+  }
 
-  const channel = await utils.discord.getChannel(channelId);
-  const message = await channel.messages.fetch(messageId);
-  const msgReactions = state.reactions[messageId] || (state.reactions[messageId] = {});
-  const isNewsletterSynthetic = typeof reaction.author === 'string' && reaction.author.startsWith('newsletter:');
-  if (isNewsletterSynthetic && !reaction.text && reaction.author.split(':').length < 3) {
-    const prefix = `${reaction.author}:`;
-    for (const [authorKey, emoji] of Object.entries(msgReactions)) {
-      if (!authorKey.startsWith(prefix)) continue;
-      await message.reactions.cache.get(emoji)?.remove().catch(() => {});
-      delete msgReactions[authorKey];
+  try {
+    const channel = await utils.discord.getChannel(channelId);
+    if (!channel?.messages?.fetch) {
+      state.logger?.warn?.({
+        jid: normalizedReactionJid,
+        id: normalizedReactionId,
+        channelId,
+      }, 'Skipping WhatsApp reaction mirror because Discord channel is unavailable');
+      return;
     }
-  }
-  const prev = msgReactions[reaction.author];
-  if (prev) {
-    await message.reactions.cache.get(prev)?.remove().catch(() => {});
-    delete msgReactions[reaction.author];
-  }
-  if (reaction.text) {
-    await message.react(reaction.text).catch(async err => {
-      if (err.code === 10014) {
-        await channel.send(`Unknown emoji reaction (${reaction.text}) received. Check WhatsApp app to see it.`);
+    const message = await channel.messages.fetch(messageId).catch(() => null);
+    if (!message) {
+      state.logger?.debug?.({
+        jid: normalizedReactionJid,
+        id: normalizedReactionId,
+        channelId,
+        messageId,
+      }, 'Skipping WhatsApp reaction mirror because Discord message lookup failed');
+      return;
+    }
+    const msgReactions = state.reactions[messageId] || (state.reactions[messageId] = {});
+    const isNewsletterSynthetic = typeof reaction.author === 'string' && reaction.author.startsWith('newsletter:');
+    if (isNewsletterSynthetic && !reaction.text && reaction.author.split(':').length < 3) {
+      const prefix = `${reaction.author}:`;
+      for (const [authorKey, emoji] of Object.entries(msgReactions)) {
+        if (!authorKey.startsWith(prefix)) continue;
+        await message.reactions.cache.get(emoji)?.remove().catch(() => {});
+        delete msgReactions[authorKey];
       }
-    });
-    msgReactions[reaction.author] = reaction.text;
-  }
-  if (!Object.keys(msgReactions).length) {
-    delete state.reactions[messageId];
+    }
+    const prev = msgReactions[reaction.author];
+    if (prev) {
+      await message.reactions.cache.get(prev)?.remove().catch(() => {});
+      delete msgReactions[reaction.author];
+    }
+    if (reaction.text) {
+      await message.react(reaction.text).catch(async err => {
+        if (err.code === 10014) {
+          await channel.send(`Unknown emoji reaction (${reaction.text}) received. Check WhatsApp app to see it.`);
+        }
+      });
+      msgReactions[reaction.author] = reaction.text;
+    }
+    if (!Object.keys(msgReactions).length) {
+      delete state.reactions[messageId];
+    }
+  } catch (err) {
+    state.logger?.error?.({
+      err,
+      jid: normalizedReactionJid,
+      id: normalizedReactionId,
+      channelId,
+      messageId,
+    }, 'Failed to mirror WhatsApp reaction to Discord');
   }
 });
 
