@@ -44,7 +44,7 @@ Routing may be restricted by deployment settings. Message-flow changes must pres
   on Discord -> WhatsApp sends)
 - newsletter delivery mode for WhatsApp `@newsletter` chats:
   outbound sends should use standard `sendMessage(...)` payloads like DMs/groups where possible.
-  edit/delete/reaction flows must resolve/use newsletter `server_id` mapping before dispatch.
+  edit/delete/reaction flows should resolve/use newsletter `server_id` mapping before dispatch; if unavailable in the current Baileys runtime, fall back to outbound IDs and still attempt delivery.
   reactions should use `newsletterReactMessage(jid, serverId, reaction?)` when available.
   when newsletter media URL sends fail and the source is Discord CDN, retry with a buffer payload before falling back to text/link.
   optional send-side hardening (ack-aware retry paths and quote fallback behavior) can be enabled with `WA2DC_NEWSLETTER_SPECIAL_FLOW=1`.

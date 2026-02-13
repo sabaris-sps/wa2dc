@@ -4271,6 +4271,10 @@ client.on('messageDelete', async (message) => {
       state.lastMessages[delayedServerId] = message.id;
     }
   }
+  if (newsletterChat && waIdsToDelete.length === 0) {
+    // Some Baileys builds do not expose newsletter server_id; fall back to mapped outbound ids.
+    waIdsToDelete = normalizedWaIds;
+  }
 
   if (message.webhookId != null && waIdsToDelete.length === 0) {
     return;

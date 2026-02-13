@@ -20,7 +20,6 @@ import { getPollEncKey, getPollOptions } from './pollUtils.js';
 import { oneWayAllowsDiscordToWhatsApp } from './oneWay.js';
 import {
     getNewsletterServerIdFromMessage,
-    isLikelyNewsletterServerId,
     normalizeBridgeMessageId,
     noteNewsletterAckError,
     waitForNewsletterAckError,
@@ -1715,6 +1714,7 @@ const connectToWhatsApp = async (retry = 1) => {
                 ackContext = 'Newsletter send',
                 notifyAckFailure = false,
                 retryWithoutQuotedOnAck = true,
+                forceNewsletterAck = false,
             } = {},
         ) => {
             const sentMessage = await sendWithNewsletterQuoteFallback(content, sendOptions);
@@ -1724,7 +1724,8 @@ const connectToWhatsApp = async (retry = 1) => {
                 isNewsletter: newsletterChat,
             });
             storeMessage(sentMessage);
-            if (!useNewsletterSpecialFlow) {
+            const shouldTrackNewsletterAck = newsletterChat && (useNewsletterSpecialFlow || forceNewsletterAck);
+            if (!shouldTrackNewsletterAck) {
                 return { sentMessage, ackErrorCode: null };
             }
 
@@ -1806,7 +1807,10 @@ const connectToWhatsApp = async (retry = 1) => {
                         const { ackErrorCode } = await sendTrackedMessage(
                             attachmentContent,
                             first ? options : undefined,
-                            { ackContext: 'Newsletter attachment send' },
+                            {
+                                ackContext: 'Newsletter attachment send',
+                                forceNewsletterAck: newsletterChat,
+                            },
                         );
                         if (!ackErrorCode) {
                             sentAnyAttachment = true;
@@ -1936,7 +1940,8 @@ const connectToWhatsApp = async (retry = 1) => {
 
         const targetJid = normalizeSendJid(jid);
         const newsletterChat = isNewsletterJid(targetJid);
-        let messageId = state.lastMessages[message.id];
+        const candidateId = normalizeBridgeMessageId(state.lastMessages[message.id]);
+        let messageId = candidateId;
         if (newsletterChat) {
             const resolvedServerId = await waitForNewsletterServerId({
                 discordMessageId: message.id,
@@ -1944,7 +1949,18 @@ const connectToWhatsApp = async (retry = 1) => {
                 timeoutMs: NEWSLETTER_SERVER_ID_WAIT_TIMEOUT_MS,
                 pollMs: NEWSLETTER_SERVER_ID_WAIT_POLL_MS,
             });
-            if (!resolvedServerId) {
+            if (resolvedServerId) {
+                messageId = resolvedServerId;
+                state.lastMessages[message.id] = resolvedServerId;
+                state.lastMessages[resolvedServerId] = message.id;
+            } else if (candidateId) {
+                state.logger?.warn?.({
+                    jid: targetJid,
+                    discordMessageId: message?.id,
+                    candidateId,
+                }, 'Timed out waiting for newsletter server ID before edit; falling back to outbound message ID');
+                messageId = candidateId;
+            } else {
                 state.logger?.warn?.({
                     jid: targetJid,
                     discordMessageId: message?.id,
@@ -1955,9 +1971,6 @@ const connectToWhatsApp = async (retry = 1) => {
                 ).catch(() => {});
                 return;
             }
-            messageId = resolvedServerId;
-            state.lastMessages[message.id] = resolvedServerId;
-            state.lastMessages[resolvedServerId] = message.id;
         }
 
         const key = {
@@ -2038,13 +2051,15 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         if (newsletterChat) {
+            const candidateId = normalizeBridgeMessageId(key.id);
             const serverId = await waitForNewsletterServerId({
                 discordMessageId: reaction?.message?.id,
                 candidateId: key.id,
                 timeoutMs: NEWSLETTER_SERVER_ID_WAIT_TIMEOUT_MS,
                 pollMs: NEWSLETTER_SERVER_ID_WAIT_POLL_MS,
             });
-            if (!serverId) {
+            const actionId = serverId || candidateId;
+            if (!actionId) {
                 state.logger?.warn?.({
                     jid: targetJid,
                     discordMessageId: reaction?.message?.id,
@@ -2055,16 +2070,23 @@ const connectToWhatsApp = async (retry = 1) => {
                 ).catch(() => {});
                 return;
             }
+            if (!serverId && candidateId) {
+                state.logger?.warn?.({
+                    jid: targetJid,
+                    discordMessageId: reaction?.message?.id,
+                    candidateId,
+                }, 'Timed out waiting for newsletter server ID before reaction; falling back to outbound message ID');
+            }
             if (typeof client.newsletterReactMessage !== 'function') {
                 state.logger?.warn?.({ jid: targetJid }, 'newsletterReactMessage is unavailable on this WhatsApp client');
                 return;
             }
-            state.lastMessages[reaction.message.id] = serverId;
-            state.lastMessages[serverId] = reaction.message.id;
+            state.lastMessages[reaction.message.id] = actionId;
+            state.lastMessages[actionId] = reaction.message.id;
 
             try {
-                await client.newsletterReactMessage(targetJid, serverId, removed ? undefined : reaction.emoji.name);
-                state.sentReactions.add(serverId);
+                await client.newsletterReactMessage(targetJid, actionId, removed ? undefined : reaction.emoji.name);
+                state.sentReactions.add(actionId);
             } catch (err) {
                 state.logger?.error(err);
                 await reaction?.message?.channel?.send(
@@ -2099,20 +2121,23 @@ const connectToWhatsApp = async (retry = 1) => {
         const targetJid = normalizeSendJid(jid);
         const newsletterChat = isNewsletterJid(targetJid);
         const rawDeleteId = normalizeBridgeMessageId(id);
+        const outboundCandidateId = rawDeleteId
+            || normalizeBridgeMessageId(state.lastMessages[discordMessageId]);
         const deleteId = newsletterChat
             ? await waitForNewsletterServerId({
                 discordMessageId,
-                candidateId: rawDeleteId,
+                candidateId: outboundCandidateId,
                 timeoutMs: NEWSLETTER_SERVER_ID_WAIT_TIMEOUT_MS,
                 pollMs: NEWSLETTER_SERVER_ID_WAIT_POLL_MS,
             })
             : rawDeleteId;
-        if (!targetJid || !deleteId) {
+        const actionDeleteId = deleteId || (newsletterChat ? outboundCandidateId : null);
+        if (!targetJid || !actionDeleteId) {
             if (newsletterChat) {
                 state.logger?.warn?.({
                     jid: targetJid,
                     discordMessageId,
-                    id,
+                    id: rawDeleteId,
                 }, 'Timed out waiting for newsletter server ID before delete');
                 await notifyLinkedDiscordChannel(
                     targetJid,
@@ -2121,25 +2146,20 @@ const connectToWhatsApp = async (retry = 1) => {
             }
             return;
         }
-        if (newsletterChat && !isLikelyNewsletterServerId(deleteId)) {
+        if (newsletterChat && !deleteId && outboundCandidateId) {
             state.logger?.warn?.({
                 jid: targetJid,
                 discordMessageId,
-                id,
-                resolvedId: deleteId,
-            }, 'Skipping newsletter delete because no server message id could be resolved');
-            await notifyLinkedDiscordChannel(
-                targetJid,
-                "Couldn't delete this newsletter message yet because a server message ID is still unavailable.",
-            );
-            return;
+                id: rawDeleteId,
+                candidateId: outboundCandidateId,
+            }, 'Timed out waiting for newsletter server ID before delete; falling back to outbound message ID');
         }
         const deleteOptions = buildSendOptionsForJid(targetJid);
         try {
             await client.sendMessage(targetJid, {
                 delete: {
                     remoteJid: targetJid,
-                    id: deleteId,
+                    id: actionDeleteId,
                     fromMe: true,
                 },
             }, deleteOptions);

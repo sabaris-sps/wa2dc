@@ -1512,7 +1512,7 @@ test('Newsletter attachment failures fall back to text/link send', async () => {
   }
 });
 
-test('Newsletter attachment ack rejection does not trigger ack fallback by default', async () => {
+test('Newsletter attachment ack rejection falls back to text/link send', async () => {
   const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
   try {
     utils.whatsapp.createDocumentContent = (attachment) => ({
@@ -1565,10 +1565,12 @@ test('Newsletter attachment ack rejection does not trigger ack fallback by defau
       },
     });
 
-    await delay(1700);
+    await delay(3000);
 
-    assert.equal(harness.fakeClient.sendCalls.length, 1);
+    assert.equal(harness.fakeClient.sendCalls.length, 2);
     assert.equal(harness.fakeClient.sendCalls[0]?.content?.image?.url, 'https://example.com/newsletter-photo.png');
+    assert.equal(harness.fakeClient.sendCalls[1]?.content?.text, 'https://example.com/newsletter-photo.png');
+    assert.equal(harness.fakeClient.sendCalls[1]?.options?.getUrlInfo, undefined);
   } finally {
     harness.cleanup();
   }
