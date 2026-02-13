@@ -357,3 +357,71 @@ test('/newslettercreate succeeds when create response has null picture metadata'
     resetClientFactoryOverrides();
   }
 });
+
+test('/newsletterinviteinfo returns invite link/code from metadata', async () => {
+  const originalDiscordUtils = {
+    getGuild: utils.discord.getGuild,
+    getControlChannel: utils.discord.getControlChannel,
+  };
+  const originalSettings = {
+    Token: state.settings.Token,
+    GuildID: state.settings.GuildID,
+    ControlChannelID: state.settings.ControlChannelID,
+  };
+  const originalDcClient = state.dcClient;
+  const originalWaClient = state.waClient;
+
+  try {
+    state.settings.Token = 'TEST_TOKEN';
+    state.settings.GuildID = 'guild';
+    state.settings.ControlChannelID = 'control';
+
+    utils.discord.getGuild = async () => ({ commands: { set: async () => {} } });
+    utils.discord.getControlChannel = async () => ({ send: async () => {} });
+
+    state.waClient = {
+      async newsletterMetadata(type, key) {
+        assert.equal(type, 'jid');
+        assert.equal(key, '120363123456789012@newsletter');
+        return {
+          id: key,
+          name: 'Bridge Test',
+          invite: 'https://whatsapp.com/channel/AbCdEfGhIjKlMnOp',
+        };
+      },
+    };
+
+    const fakeClient = new FakeDiscordClient();
+    setClientFactoryOverrides({ createDiscordClient: () => fakeClient });
+    const discordHandler = await importDiscordHandler('newsletterinviteinfo-basic');
+    state.dcClient = await discordHandler.start();
+    await delay(0);
+
+    const interaction = createInteraction({
+      channelId: 'control',
+      commandName: 'newsletterinviteinfo',
+      stringOptions: {
+        jid: '120363123456789012@newsletter',
+      },
+    });
+    fakeClient.emit('interactionCreate', interaction);
+    await delay(0);
+
+    assert.equal(interaction.records.editReply.length, 1);
+    const content = String(interaction.records.editReply[0]?.content || '');
+    assert.ok(content.includes('Newsletter: `120363123456789012@newsletter`'));
+    assert.ok(content.includes('Invite code: `AbCdEfGhIjKlMnOp`'));
+    assert.ok(content.includes('Invite link: https://whatsapp.com/channel/AbCdEfGhIjKlMnOp'));
+  } finally {
+    utils.discord.getGuild = originalDiscordUtils.getGuild;
+    utils.discord.getControlChannel = originalDiscordUtils.getControlChannel;
+
+    state.settings.Token = originalSettings.Token;
+    state.settings.GuildID = originalSettings.GuildID;
+    state.settings.ControlChannelID = originalSettings.ControlChannelID;
+
+    state.dcClient = originalDcClient;
+    state.waClient = originalWaClient;
+    resetClientFactoryOverrides();
+  }
+});

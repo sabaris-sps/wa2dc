@@ -1287,6 +1287,58 @@ const formatJsonForReply = (value) => {
 
 const formatNewsletterJidForReply = (jid) => utils.whatsapp.formatJidForDisplay(jid) || jid;
 
+const parseNewsletterInvite = (value) => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return null;
+
+  const tryParseUrl = (raw) => {
+    try {
+      return new URL(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const parsed = tryParseUrl(trimmed);
+  if (parsed) {
+    const rawPath = parsed.pathname || '';
+    const parts = rawPath.split('/').filter(Boolean);
+    const channelIdx = parts.findIndex((part) => part.toLowerCase() === 'channel');
+    const codeFromPath = channelIdx >= 0 ? (parts[channelIdx + 1] || '') : '';
+    const code = (parsed.searchParams.get('code') || codeFromPath || '').trim();
+    return {
+      code: code || null,
+      link: trimmed,
+      raw: trimmed,
+    };
+  }
+
+  return {
+    code: trimmed,
+    link: `https://whatsapp.com/channel/${encodeURIComponent(trimmed)}`,
+    raw: trimmed,
+  };
+};
+
+const extractNewsletterInviteFromMetadata = (metadata = {}) => {
+  const candidates = [
+    metadata?.invite,
+    metadata?.inviteLink,
+    metadata?.invite_link,
+    metadata?.threadMetadata?.invite,
+    metadata?.threadMetadata?.inviteLink,
+    metadata?.threadMetadata?.invite_link,
+    metadata?.thread_metadata?.invite,
+    metadata?.thread_metadata?.inviteLink,
+    metadata?.thread_metadata?.invite_link,
+  ];
+  for (const candidate of candidates) {
+    const parsed = parseNewsletterInvite(candidate);
+    if (parsed) return parsed;
+  }
+  return null;
+};
+
 const extractNewsletterJid = (result) => {
   const candidates = [
     result?.jid,
@@ -2144,6 +2196,53 @@ const commandHandlers = {
         lines.push(`Description: ${description}`);
       }
       lines.push('', 'Raw metadata:', `\`\`\`json\n${formatJsonForReply(metadata)}\n\`\`\``);
+      await ctx.replyPartitioned(lines.join('\n'));
+    },
+  },
+  newsletterinviteinfo: {
+    description: 'Show invite link/code for a newsletter.',
+    options: [
+      {
+        name: 'jid',
+        description: 'Target newsletter JID (optional if this channel is linked).',
+        type: ApplicationCommandOptionTypes.STRING,
+        required: false,
+      },
+    ],
+    async execute(ctx) {
+      const fetchMetadata = await requireNewsletterMethod(ctx, 'newsletterMetadata');
+      if (!fetchMetadata) {
+        return;
+      }
+      const jid = await resolveNewsletterJidFromCommand(ctx);
+      if (!jid) {
+        return;
+      }
+
+      let metadata;
+      try {
+        metadata = await fetchMetadata('jid', jid);
+      } catch (err) {
+        state.logger?.error({ err, jid }, 'Failed to fetch newsletter metadata for invite info');
+        await ctx.reply(`Failed to fetch invite info for \`${formatNewsletterJidForReply(jid)}\`.`);
+        return;
+      }
+
+      const inviteInfo = extractNewsletterInviteFromMetadata(metadata || {});
+      if (!inviteInfo) {
+        await ctx.reply(
+          `No invite code/link is exposed for \`${formatNewsletterJidForReply(jid)}\` in the current metadata response.`,
+        );
+        return;
+      }
+
+      const lines = [
+        `Newsletter: \`${formatNewsletterJidForReply(jid)}\``,
+      ];
+      if (inviteInfo.code) {
+        lines.push(`Invite code: \`${inviteInfo.code}\``);
+      }
+      lines.push(`Invite link: ${inviteInfo.link}`);
       await ctx.replyPartitioned(lines.join('\n'));
     },
   },

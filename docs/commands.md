@@ -107,6 +107,10 @@ Usage: `/newslettersubscribeupdates jid:<optional ...@newsletter>`
 Fetch raw newsletter metadata (including viewer role if exposed by WhatsApp).  
 Usage: `/newslettermetadata jid:<optional ...@newsletter>`
 
+### `/newsletterinviteinfo`
+Show the newsletter invite code/link exposed by WhatsApp metadata.  
+Usage: `/newsletterinviteinfo jid:<optional ...@newsletter>`
+
 ### `/newsletterchangeowner`
 Transfer newsletter ownership to another WhatsApp user JID/number.  
 Usage: `/newsletterchangeowner user:<jid or number> jid:<optional ...@newsletter>`
