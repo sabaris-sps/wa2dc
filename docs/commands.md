@@ -42,7 +42,7 @@ Usage: `/setpinduration duration:<24h|7d|30d>`
 
 ### Newsletters
 
-Once a newsletter is linked to a Discord channel, regular messages flow through the bridge normally (no special send command needed). WA2DC now attempts quote-threading for Discord replies, and falls back to plain reply-context text if newsletter quote payloads are rejected or unavailable. For newsletter media, WA2DC waits for WhatsApp ack outcomes, retries failed Discord-CDN media sends as buffer payloads when possible, and then falls back to text + links if media still fails.
+Once a newsletter is linked to a Discord channel, regular messages flow through the bridge normally (no special send command needed). By default, Discord -> WhatsApp newsletter sends/edits/deletes/reactions now use the same bridge path as normal DMs/groups. If you need the previous newsletter-specific flow (server-id waits, ack retry handling, newsletter reaction API), set `WA2DC_NEWSLETTER_SPECIAL_FLOW=1` before starting WA2DC.
 
 ### `/newslettercreate`
 Create a WhatsApp newsletter and automatically link it to a Discord channel.  
@@ -97,7 +97,7 @@ Usage: `/newslettermessages jid:<optional ...@newsletter> count:<1-50> before:<u
 React to a newsletter message (or remove your reaction).  
 Usage: `/newsletterreact serverid:<newsletter message id> reaction:<optional emoji> jid:<optional ...@newsletter>`  
 If `reaction` is omitted, WA2DC removes your existing reaction for that message.
-You can also react directly with Discord emoji in linked newsletter channels; WA2DC routes those through the newsletter-specific reaction API automatically and briefly waits for server message ID resolution when needed.
+You can also react directly with Discord emoji in linked newsletter channels; by default WA2DC routes these through the same generic reaction path used for normal chats (matching DM/group behavior).
 
 ### `/newslettersubscribeupdates`
 Request newsletter live updates subscription metadata.  

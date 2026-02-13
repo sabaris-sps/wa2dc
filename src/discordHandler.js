@@ -1159,6 +1159,8 @@ client.on('whatsappPin', async ({ jid, key, pinned }) => {
 
 const { ApplicationCommandOptionTypes } = Constants;
 const isNewsletterJid = (jid = '') => typeof jid === 'string' && jid.endsWith('@newsletter');
+const NEWSLETTER_SPECIAL_FLOW_ENABLED = process.env.WA2DC_NEWSLETTER_SPECIAL_FLOW === '1';
+const useNewsletterSpecialFlowForJid = (jid = '') => NEWSLETTER_SPECIAL_FLOW_ENABLED && isNewsletterJid(jid);
 const NEWSLETTER_CREATE_QUERY_ID = baileys.QueryIds?.CREATE || '8823471724422422';
 const NEWSLETTER_CREATE_DATA_PATH = baileys.XWAPaths?.xwa2_newsletter_create || 'xwa2_newsletter_create';
 const WMEX_SERVER_JID = baileys.S_WHATSAPP_NET || 's.whatsapp.net';
@@ -4137,7 +4139,7 @@ client.on('messageUpdate', async (oldMessage, message) => {
   if (jid == null) {
     return;
   }
-  const newsletterChat = isNewsletterJid(jid);
+  const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(jid);
 
   const oldPinned = typeof oldMessage?.pinned === 'boolean' ? oldMessage.pinned : undefined;
   const newPinned = Boolean(message.pinned);
@@ -4195,7 +4197,7 @@ client.on('messageUpdate', async (oldMessage, message) => {
   }
 
   let messageId = state.lastMessages[message.id];
-  if (newsletterChat) {
+  if (useNewsletterSpecialFlow) {
     const resolvedServerId = await waitForNewsletterServerId({
       discordMessageId: message.id,
       candidateId: messageId,
@@ -4212,7 +4214,7 @@ client.on('messageUpdate', async (oldMessage, message) => {
     if (message.author?.bot && !state.settings.redirectBots) {
       return;
     }
-    const reason = newsletterChat
+    const reason = useNewsletterSpecialFlow
       ? "Couldn't edit this newsletter message yet because a server message ID is not available."
       : `Couldn't edit the message. You can only edit the last ${state.settings.lastMessageStorage} messages.`;
     await message.channel.send(reason);
@@ -4247,18 +4249,18 @@ client.on('messageDelete', async (message) => {
     }
   }
   const normalizedWaIds = [...new Set(waIds.map((id) => normalizeBridgeMessageId(id)).filter(Boolean))];
-  const newsletterChat = isNewsletterJid(jid);
-  const newsletterServerId = newsletterChat
+  const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(jid);
+  const newsletterServerId = useNewsletterSpecialFlow
     ? resolveNewsletterServerIdForDiscordMessage(message.id, state.lastMessages[message.id] || normalizedWaIds[0] || null)
     : null;
-  let waIdsToDelete = newsletterChat
+  let waIdsToDelete = useNewsletterSpecialFlow
     ? [...new Set([
       ...(newsletterServerId && isLikelyNewsletterServerId(newsletterServerId) ? [newsletterServerId] : []),
       ...normalizedWaIds.filter((id) => isLikelyNewsletterServerId(id)),
     ])]
     : normalizedWaIds;
 
-  if (newsletterChat && waIdsToDelete.length === 0) {
+  if (useNewsletterSpecialFlow && waIdsToDelete.length === 0) {
     const delayedServerId = await waitForNewsletterServerId({
       discordMessageId: message.id,
       candidateId: state.lastMessages[message.id] || normalizedWaIds[0] || null,
@@ -4285,7 +4287,7 @@ client.on('messageDelete', async (message) => {
   }
 
   if (waIdsToDelete.length === 0) {
-    const reason = newsletterChat
+    const reason = useNewsletterSpecialFlow
       ? "Couldn't delete this newsletter message because a server message ID is still unavailable."
       : `Couldn't delete the message. You can only delete the last ${state.settings.lastMessageStorage} messages.`;
     await message.channel.send(reason);
@@ -4307,7 +4309,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
   if (jid == null) {
     return;
   }
-  const newsletterChat = isNewsletterJid(jid);
+  const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(jid);
   const isBotUser = user?.id === state.dcClient?.user?.id;
   if (
     isBotUser
@@ -4320,7 +4322,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
     return;
   }
   let messageId = state.lastMessages[reaction.message.id];
-  if (newsletterChat) {
+  if (useNewsletterSpecialFlow) {
     const resolvedServerId = await waitForNewsletterServerId({
       discordMessageId: reaction.message.id,
       candidateId: messageId,
@@ -4337,7 +4339,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (reaction.message.webhookId == null && reaction.message.author?.bot && !state.settings.redirectBots) {
       return;
     }
-    const reason = newsletterChat
+    const reason = useNewsletterSpecialFlow
       ? "Couldn't send the reaction because the newsletter server message ID is still unavailable."
       : `Couldn't send the reaction. You can only react to last ${state.settings.lastMessageStorage} messages.`;
     await reaction.message.channel.send(reason);
@@ -4363,7 +4365,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
   if (jid == null) {
     return;
   }
-  const newsletterChat = isNewsletterJid(jid);
+  const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(jid);
   const isBotUser = user?.id === state.dcClient?.user?.id;
   if (
     isBotUser
@@ -4376,7 +4378,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
     return;
   }
   let messageId = state.lastMessages[reaction.message.id];
-  if (newsletterChat) {
+  if (useNewsletterSpecialFlow) {
     const resolvedServerId = await waitForNewsletterServerId({
       discordMessageId: reaction.message.id,
       candidateId: messageId,
@@ -4393,7 +4395,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
     if (reaction.message.webhookId == null && reaction.message.author?.bot && !state.settings.redirectBots) {
       return;
     }
-    const reason = newsletterChat
+    const reason = useNewsletterSpecialFlow
       ? "Couldn't remove the reaction because the newsletter server message ID is still unavailable."
       : `Couldn't remove the reaction. You can only react to last ${state.settings.lastMessageStorage} messages.`;
     await reaction.message.channel.send(reason);

@@ -139,6 +139,8 @@ const getStoredMessageWithJidFallback = async (key = {}) => {
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const isBroadcastJid = (jid = '') => typeof jid === 'string' && jid.endsWith('@broadcast');
 const isNewsletterJid = (jid = '') => typeof jid === 'string' && jid.endsWith('@newsletter');
+const NEWSLETTER_SPECIAL_FLOW_ENABLED = process.env.WA2DC_NEWSLETTER_SPECIAL_FLOW === '1';
+const useNewsletterSpecialFlowForJid = (jid = '') => NEWSLETTER_SPECIAL_FLOW_ENABLED && isNewsletterJid(jid);
 const normalizeSendJid = (jid) => utils.whatsapp.formatJid(jid) || jid;
 const NEWSLETTER_SERVER_ID_WAIT_TIMEOUT_MS = 8000;
 const NEWSLETTER_SERVER_ID_WAIT_POLL_MS = 150;
@@ -822,11 +824,11 @@ const patchSendMessageForLinkPreviews = (client) => {
         if (!normalizedOptions.logger) {
             normalizedOptions.logger = state.logger;
         }
-        const isNewsletterChat = isNewsletterJid(sendJid);
-        if (isNewsletterChat) {
+        const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(sendJid);
+        if (useNewsletterSpecialFlow) {
             normalizedOptions.getUrlInfo = undefined;
         }
-        const needsGeneratedPreview = !isNewsletterChat && !content?.linkPreview;
+        const needsGeneratedPreview = !useNewsletterSpecialFlow && !content?.linkPreview;
         if (needsGeneratedPreview && !normalizedOptions.getUrlInfo) {
             normalizedOptions.getUrlInfo = defaultGetUrlInfo;
         }
@@ -1533,7 +1535,7 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         const targetJid = normalizeSendJid(jid);
-        const isNewsletterChat = isNewsletterJid(targetJid);
+        const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(targetJid);
         const isForwardedFromDiscord = Boolean(forwardContext?.isForwarded);
         const hasReplyReference = !isForwardedFromDiscord && Boolean(message.reference);
         const options = buildSendOptionsForJid(targetJid);
@@ -1546,7 +1548,7 @@ const connectToWhatsApp = async (retry = 1) => {
         if (hasReplyReference) {
             options.quoted = await utils.whatsapp.createQuoteMessage(message, targetJid);
             if (options.quoted == null) {
-                if (isNewsletterChat) {
+                if (useNewsletterSpecialFlow) {
                     newsletterReplyFallbackContext = await buildNewsletterReplyFallbackContext(message) || '';
                 } else {
                     message.channel.send(`Couldn't find the message quoted. You can only reply to last ${state.settings.lastMessageStorage} messages. Sending the message without the quoted message.`);
@@ -1677,7 +1679,7 @@ const connectToWhatsApp = async (retry = 1) => {
         text = mentionResolution.text;
         const mentionJids = mentionResolution.mentionJids;
         const ensureNewsletterReplyFallbackContext = async () => {
-            if (!isNewsletterChat || !hasReplyReference) return '';
+            if (!useNewsletterSpecialFlow || !hasReplyReference) return '';
             if (newsletterReplyFallbackContext) return newsletterReplyFallbackContext;
             newsletterReplyFallbackContext = await buildNewsletterReplyFallbackContext(message) || '';
             return newsletterReplyFallbackContext;
@@ -1686,7 +1688,7 @@ const connectToWhatsApp = async (retry = 1) => {
             try {
                 return await client.sendMessage(targetJid, content, sendOptions);
             } catch (err) {
-                if (!isNewsletterChat || !sendOptions?.quoted) {
+                if (!useNewsletterSpecialFlow || !sendOptions?.quoted) {
                     throw err;
                 }
                 const replyContext = await ensureNewsletterReplyFallbackContext();
@@ -1718,10 +1720,10 @@ const connectToWhatsApp = async (retry = 1) => {
             mapDiscordMessageToWhatsAppMessage({
                 discordMessageId: message.id,
                 sentMessage,
-                isNewsletter: isNewsletterChat,
+                isNewsletter: useNewsletterSpecialFlow,
             });
             storeMessage(sentMessage);
-            if (!isNewsletterChat) {
+            if (!useNewsletterSpecialFlow) {
                 return { sentMessage, ackErrorCode: null };
             }
 
@@ -1735,7 +1737,7 @@ const connectToWhatsApp = async (retry = 1) => {
                 discordMessageId: message.id,
                 sentMessage,
             });
-            if (isNewsletterChat && retryWithoutQuotedOnAck && sendOptions?.quoted) {
+            if (useNewsletterSpecialFlow && retryWithoutQuotedOnAck && sendOptions?.quoted) {
                 const replyContext = await ensureNewsletterReplyFallbackContext();
                 const retryContent = cloneNewsletterSendContentWithReplyFallback(content, replyContext);
                 const retryOptions = { ...sendOptions };
@@ -1788,12 +1790,12 @@ const connectToWhatsApp = async (retry = 1) => {
                     if (isForwardedFromDiscord) {
                         captionText = captionText ? `Forwarded\n${captionText}` : 'Forwarded';
                     }
-                    if (isNewsletterChat && hasReplyReference && !options.quoted) {
+                    if (useNewsletterSpecialFlow && hasReplyReference && !options.quoted) {
                         const replyContext = await ensureNewsletterReplyFallbackContext();
                         captionText = prependReplyFallbackContext(captionText, replyContext);
                     }
                     if (captionText || mentionJids.length) doc.caption = captionText;
-                    if (!isNewsletterChat && mentionJids.length) doc.mentions = mentionJids;
+                    if (!useNewsletterSpecialFlow && mentionJids.length) doc.mentions = mentionJids;
                 }
                 let attachmentContent = doc;
                 let didBufferRetry = false;
@@ -1810,7 +1812,7 @@ const connectToWhatsApp = async (retry = 1) => {
                             sentAttachment = true;
                             break;
                         }
-                        if (!isNewsletterChat || didBufferRetry) {
+                        if (!useNewsletterSpecialFlow || didBufferRetry) {
                             break;
                         }
                         const bufferRetryContent = await buildNewsletterBufferRetryContent(doc, preparedFile);
@@ -1826,7 +1828,7 @@ const connectToWhatsApp = async (retry = 1) => {
                         }, 'Retrying newsletter attachment with buffer payload after ack rejection');
                         continue;
                     } catch (err) {
-                        if (!isNewsletterChat || didBufferRetry) {
+                        if (!useNewsletterSpecialFlow || didBufferRetry) {
                             state.logger?.error(err);
                             break;
                         }
@@ -1873,7 +1875,7 @@ const connectToWhatsApp = async (retry = 1) => {
         if (isForwardedFromDiscord) {
             finalText = finalText ? `Forwarded\n${finalText}` : 'Forwarded';
         }
-        if (isNewsletterChat && hasReplyReference && !options.quoted) {
+        if (useNewsletterSpecialFlow && hasReplyReference && !options.quoted) {
             const replyContext = await ensureNewsletterReplyFallbackContext();
             finalText = prependReplyFallbackContext(finalText, replyContext);
         }
@@ -1882,11 +1884,11 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         const content = { text: finalText };
-        if (!isNewsletterChat && mentionJids.length) {
+        if (!useNewsletterSpecialFlow && mentionJids.length) {
             content.mentions = mentionJids;
         }
         let preview = null;
-        if (!isNewsletterChat) {
+        if (!useNewsletterSpecialFlow) {
             try {
                 preview = await utils.whatsapp.generateLinkPreview(finalText, {
                     uploadImage: typeof client.waUploadToServer === 'function' ? client.waUploadToServer : undefined,
@@ -1904,14 +1906,14 @@ const connectToWhatsApp = async (retry = 1) => {
         try {
             const { ackErrorCode } = await sendTrackedMessage(content, options, {
                 ackContext: 'Newsletter text send',
-                notifyAckFailure: isNewsletterChat,
+                notifyAckFailure: useNewsletterSpecialFlow,
             });
             if (ackErrorCode) {
                 return;
             }
         } catch (err) {
             state.logger?.error(err);
-            if (isNewsletterChat) {
+            if (useNewsletterSpecialFlow) {
                 const metadata = typeof client.newsletterMetadata === 'function'
                     ? await client.newsletterMetadata('jid', targetJid).catch(() => null)
                     : null;
@@ -1932,9 +1934,9 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         const targetJid = normalizeSendJid(jid);
-        const newsletterChat = isNewsletterJid(targetJid);
+        const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(targetJid);
         let messageId = state.lastMessages[message.id];
-        if (newsletterChat) {
+        if (useNewsletterSpecialFlow) {
             const resolvedServerId = await waitForNewsletterServerId({
                 discordMessageId: message.id,
                 candidateId: messageId,
@@ -2006,7 +2008,7 @@ const connectToWhatsApp = async (retry = 1) => {
                 {
                     text,
                     edit: key,
-                    ...(!newsletterChat && editMentions.length ? { mentions: editMentions } : {}),
+                    ...(!useNewsletterSpecialFlow && editMentions.length ? { mentions: editMentions } : {}),
                 },
                 editOptions,
             );
@@ -2023,7 +2025,7 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         const targetJid = normalizeSendJid(jid);
-        const newsletterChat = isNewsletterJid(targetJid);
+        const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(targetJid);
         const key = {
             id: state.lastMessages[reaction.message.id],
             fromMe: reaction.message.webhookId == null || reaction.message.author.username === 'You',
@@ -2034,7 +2036,7 @@ const connectToWhatsApp = async (retry = 1) => {
             key.participant = utils.whatsapp.toJid(reaction.message.author.username);
         }
 
-        if (newsletterChat) {
+        if (useNewsletterSpecialFlow) {
             const serverId = await waitForNewsletterServerId({
                 discordMessageId: reaction?.message?.id,
                 candidateId: key.id,
@@ -2094,9 +2096,9 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         const targetJid = normalizeSendJid(jid);
-        const isNewsletterChat = isNewsletterJid(targetJid);
+        const useNewsletterSpecialFlow = useNewsletterSpecialFlowForJid(targetJid);
         const rawDeleteId = normalizeBridgeMessageId(id);
-        const deleteId = isNewsletterChat
+        const deleteId = useNewsletterSpecialFlow
             ? await waitForNewsletterServerId({
                 discordMessageId,
                 candidateId: rawDeleteId,
@@ -2105,7 +2107,7 @@ const connectToWhatsApp = async (retry = 1) => {
             })
             : rawDeleteId;
         if (!targetJid || !deleteId) {
-            if (isNewsletterChat) {
+            if (useNewsletterSpecialFlow) {
                 state.logger?.warn?.({
                     jid: targetJid,
                     discordMessageId,
@@ -2118,7 +2120,7 @@ const connectToWhatsApp = async (retry = 1) => {
             }
             return;
         }
-        if (isNewsletterChat && !isLikelyNewsletterServerId(deleteId)) {
+        if (useNewsletterSpecialFlow && !isLikelyNewsletterServerId(deleteId)) {
             state.logger?.warn?.({
                 jid: targetJid,
                 discordMessageId,

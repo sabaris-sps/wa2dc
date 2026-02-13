@@ -480,7 +480,7 @@ test('Discord messageDelete in newsletter channels emits server_id mapped discor
   }
 });
 
-test('Discord messageDelete in newsletter channels waits for delayed server_id mapping', async () => {
+test('Discord messageDelete in newsletter channels does not wait for delayed server_id mapping by default', async () => {
   const originalDiscordUtils = {
     getGuild: utils.discord.getGuild,
     getControlChannel: utils.discord.getControlChannel,
@@ -541,11 +541,7 @@ test('Discord messageDelete in newsletter channels waits for delayed server_id m
     });
     await delay(500);
 
-    assert.deepEqual(waEvents, [{
-      jid: '120363123456789@newsletter',
-      id: 'server-delayed-1',
-      discordMessageId: 'dc-news-delayed',
-    }]);
+    assert.deepEqual(waEvents, []);
   } finally {
     utils.discord.getGuild = originalDiscordUtils.getGuild;
     utils.discord.getControlChannel = originalDiscordUtils.getControlChannel;
@@ -562,7 +558,7 @@ test('Discord messageDelete in newsletter channels waits for delayed server_id m
   }
 });
 
-test('Discord newsletter deletes ignore outbound client ids while waiting for server_id mapping', async () => {
+test('Discord newsletter deletes use currently mapped outbound ids by default', async () => {
   const originalDiscordUtils = {
     getGuild: utils.discord.getGuild,
     getControlChannel: utils.discord.getControlChannel,
@@ -628,7 +624,7 @@ test('Discord newsletter deletes ignore outbound client ids while waiting for se
 
     assert.deepEqual(waEvents, [{
       jid: '120363123456789@newsletter',
-      id: 'server-delayed-outbound-1',
+      id: '3EB0DD14CD06ABCE146147',
       discordMessageId: 'dc-news-outbound',
     }]);
   } finally {
@@ -1789,7 +1785,7 @@ test('Discord reactions emit discordReaction towards WhatsApp', async () => {
   }
 });
 
-test('Discord newsletter reactions wait for delayed server_id mapping', async () => {
+test('Discord newsletter reactions do not wait for delayed server_id mapping by default', async () => {
   const originalDiscordUtils = {
     getGuild: utils.discord.getGuild,
     getControlChannel: utils.discord.getControlChannel,
@@ -1836,11 +1832,6 @@ test('Discord newsletter reactions wait for delayed server_id mapping', async ()
     const discordHandler = await importDiscordHandler('newsletter-reaction-wait-server-id');
     state.dcClient = await discordHandler.start();
 
-    setTimeout(() => {
-      state.lastMessages['server-react-delayed-1'] = 'dc-news-react-delayed';
-      state.lastMessages['dc-news-react-delayed'] = 'server-react-delayed-1';
-    }, 120);
-
     fakeClient.emit('messageReactionAdd', {
       emoji: { name: '🔥' },
       message: {
@@ -1852,12 +1843,9 @@ test('Discord newsletter reactions wait for delayed server_id mapping', async ()
       },
     }, { id: 'user-1' });
 
-    await delay(500);
+    await delay(200);
 
-    assert.equal(waEvents.length, 1);
-    assert.equal(waEvents[0]?.jid, '120363123456789@newsletter');
-    assert.equal(state.lastMessages['dc-news-react-delayed'], 'server-react-delayed-1');
-    assert.equal(state.lastMessages['server-react-delayed-1'], 'dc-news-react-delayed');
+    assert.equal(waEvents.length, 0);
   } finally {
     utils.discord.getGuild = originalDiscordUtils.getGuild;
     utils.discord.getControlChannel = originalDiscordUtils.getControlChannel;
