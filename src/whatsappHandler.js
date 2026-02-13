@@ -823,8 +823,8 @@ const patchSendMessageForLinkPreviews = (client) => {
             normalizedOptions.logger = state.logger;
         }
         const isNewsletterChat = isNewsletterJid(sendJid);
-        if (isNewsletterChat && normalizedOptions.getUrlInfo) {
-            delete normalizedOptions.getUrlInfo;
+        if (isNewsletterChat) {
+            normalizedOptions.getUrlInfo = undefined;
         }
         const needsGeneratedPreview = !isNewsletterChat && !content?.linkPreview;
         if (needsGeneratedPreview && !normalizedOptions.getUrlInfo) {
@@ -938,6 +938,10 @@ const patchSendNodeForNewsletterMessages = (client) => {
                 const mediatype = getNewsletterMediaTypeFromMessage(decodedMessage);
                 if (mediatype) {
                     frame.attrs.mediatype = mediatype;
+                    plaintextNode.attrs = {
+                        ...(plaintextNode.attrs || {}),
+                        mediatype,
+                    };
                 }
             }
 
@@ -1707,6 +1711,7 @@ const connectToWhatsApp = async (retry = 1) => {
             {
                 ackContext = 'Newsletter send',
                 notifyAckFailure = false,
+                retryWithoutQuotedOnAck = true,
             } = {},
         ) => {
             const sentMessage = await sendWithNewsletterQuoteFallback(content, sendOptions);
@@ -1730,6 +1735,29 @@ const connectToWhatsApp = async (retry = 1) => {
                 discordMessageId: message.id,
                 sentMessage,
             });
+            if (isNewsletterChat && retryWithoutQuotedOnAck && sendOptions?.quoted) {
+                const replyContext = await ensureNewsletterReplyFallbackContext();
+                const retryContent = cloneNewsletterSendContentWithReplyFallback(content, replyContext);
+                const retryOptions = { ...sendOptions };
+                delete retryOptions.quoted;
+                state.logger?.warn?.({
+                    jid: targetJid,
+                    discordMessageId: message.id,
+                    outboundId: sentMessage?.key?.id,
+                    serverId: getNewsletterServerIdFromMessage(sentMessage),
+                    error: ackErrorCode,
+                    ackWaitMs,
+                }, `${ackContext} was rejected by WhatsApp ack; retrying without quoted context`);
+                return await sendTrackedMessage(
+                    retryContent,
+                    Object.keys(retryOptions).length ? retryOptions : undefined,
+                    {
+                        ackContext,
+                        notifyAckFailure,
+                        retryWithoutQuotedOnAck: false,
+                    },
+                );
+            }
             state.logger?.warn?.({
                 jid: targetJid,
                 discordMessageId: message.id,

@@ -637,6 +637,7 @@ test('Discord newsletter sends use normalized JIDs and map server IDs', async ()
 
     assert.equal(harness.fakeClient.sendCalls.length, 1);
     assert.equal(harness.fakeClient.sendCalls[0]?.jid, '1203630@newsletter');
+    assert.equal(harness.fakeClient.sendCalls[0]?.options?.getUrlInfo, undefined);
     assert.equal(state.lastMessages['dc-news-send'], 'server-1');
     assert.equal(state.lastMessages['server-1'], 'dc-news-send');
     assert.ok(messageStore.get({ remoteJid: '1203630@newsletter', id: 'sent-1' }));
@@ -1242,6 +1243,58 @@ test('Discord replies to newsletter chats attempt WhatsApp quote lookup', async 
   }
 });
 
+test('Newsletter ack rejection retries quoted sends without quoted context', async () => {
+  const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
+  try {
+    utils.whatsapp.createQuoteMessage = async () => ({ key: { id: 'wa-quote-ack-retry' } });
+
+    harness.fakeClient.sendMessage = async (jid, content, options) => {
+      harness.fakeClient.sendCalls.push({ jid, content, options });
+      harness.fakeClient._sendCounter += 1;
+      const outboundId = `ack-quote-retry-${harness.fakeClient._sendCounter}`;
+      if (harness.fakeClient._sendCounter === 1) {
+        setTimeout(() => {
+          harness.fakeClient.ev.emit('messages.update', [{
+            key: { id: outboundId, remoteJid: jid, fromMe: true },
+            update: {
+              status: WAMessageStatus.ERROR,
+              messageStubParameters: ['479'],
+            },
+          }]);
+        }, 100);
+      }
+      return { key: { id: outboundId, remoteJid: jid, server_id: `server-${harness.fakeClient._sendCounter}` } };
+    };
+
+    harness.fakeClient.ev.emit('discordMessage', {
+      jid: '120363123456789@newsletter',
+      message: {
+        id: 'dc-newsletter-ack-quote-retry',
+        content: 'newsletter post',
+        cleanContent: 'newsletter post',
+        reference: { channelId: 'chan-1', messageId: 'msg-1' },
+        webhookId: null,
+        author: { username: 'BridgeUser' },
+        member: { displayName: 'BridgeUser' },
+        channel: { send: async () => {} },
+        attachments: new Map(),
+        stickers: new Map(),
+        embeds: [],
+        mentions: { users: new Map(), members: new Map(), roles: new Map() },
+      },
+    });
+
+    await delay(2800);
+
+    assert.equal(harness.fakeClient.sendCalls.length, 2);
+    assert.ok(harness.fakeClient.sendCalls[0]?.options?.quoted);
+    assert.equal(harness.fakeClient.sendCalls[1]?.options?.quoted, undefined);
+    assert.ok((harness.fakeClient.sendCalls[1]?.content?.text || '').includes('Replying to'));
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('Newsletter replies without quote mapping include fallback reply context text', async () => {
   const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
   try {
@@ -1528,6 +1581,7 @@ test('Newsletter attachment ack rejection falls back to text/link send', async (
     assert.equal(harness.fakeClient.sendCalls.length, 2);
     assert.equal(harness.fakeClient.sendCalls[0]?.content?.image?.url, 'https://example.com/newsletter-photo.png');
     assert.equal(harness.fakeClient.sendCalls[1]?.content?.text, 'https://example.com/newsletter-photo.png');
+    assert.equal(harness.fakeClient.sendCalls[1]?.options?.getUrlInfo, undefined);
   } finally {
     harness.cleanup();
   }
