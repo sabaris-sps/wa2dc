@@ -43,7 +43,7 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), now maintained by 
 
 ## Baileys 7 migration
 
-This repository currently pins Baileys to commit `7a5b09061664f5c37d60faebc7771042b26fb059` (package version `7.0.0-rc.9`). Upstream outlines every breaking change in their migration article: [https://whiskey.so/migrate-latest](https://whiskey.so/migrate-latest). Notes and common workarounds:
+This repository currently pins the published npm package `@whiskeysockets/baileys@7.0.0-rc.9`. Upstream outlines every breaking change in their migration article: [https://whiskey.so/migrate-latest](https://whiskey.so/migrate-latest). Notes and common workarounds:
 
 **Notes**
 

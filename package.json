@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
-    "@whiskeysockets/baileys": "github:WhiskeySockets/Baileys#7a5b09061664f5c37d60faebc7771042b26fb059",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "discord.js": "^13.17.1",
     "jimp": "^1.6.0",
     "link-preview-js": "^3.2.0",
