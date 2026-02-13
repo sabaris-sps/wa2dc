@@ -1929,6 +1929,41 @@ test('Newsletter attachment send errors use one media attempt then text/link fal
   }
 });
 
+test('Ack-rejected newsletter fromMe upserts are not mirrored back to Discord', async () => {
+  const harness = await setupWhatsAppHarness();
+  try {
+    harness.fakeClient.ev.emit('messages.update', [{
+      key: {
+        id: 'newsletter-ack-rejected-1',
+        remoteJid: '120363123456789@newsletter',
+        fromMe: true,
+      },
+      update: {
+        status: WAMessageStatus.ERROR,
+        messageStubParameters: ['479'],
+      },
+    }]);
+    await delay(0);
+
+    harness.fakeClient.ev.emit('messages.upsert', {
+      type: 'notify',
+      messages: [{
+        key: {
+          id: 'newsletter-ack-rejected-1',
+          remoteJid: '120363123456789@newsletter',
+          fromMe: true,
+        },
+        message: 'ghost copy should be skipped',
+      }],
+    });
+    await delay(0);
+
+    assert.equal(harness.forwarded.messages.length, 0);
+  } finally {
+    harness.cleanup();
+  }
+});
+
 test('oneWay gating blocks Discord -> WhatsApp sends', async () => {
   const harness = await setupWhatsAppHarness({ oneWay: 0b01 });
   try {

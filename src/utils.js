@@ -3348,6 +3348,30 @@ const whatsapp = {
   async getFile(rawMsg, msgType) {
     const [nMsgType, msg] = this.getMessage(rawMsg, msgType);
     if (msg.fileLength == null) return;
+    const remoteJid = this.formatJid(rawMsg?.key?.remoteJid || rawMsg?.chatId || rawMsg?.attrs?.from || rawMsg?.remoteJid);
+    const isNewsletter = typeof remoteJid === 'string' && remoteJid.endsWith('@newsletter');
+    const hasMediaPath = Boolean(msg?.url || msg?.directPath || msg?.direct_path);
+    const mediaKeyLength = (() => {
+      const mediaKey = msg?.mediaKey;
+      if (!mediaKey) return 0;
+      if (typeof mediaKey === 'string') return mediaKey.length;
+      if (Buffer.isBuffer(mediaKey) || mediaKey instanceof Uint8Array) return mediaKey.length;
+      if (Array.isArray(mediaKey)) return mediaKey.length;
+      if (typeof mediaKey === 'object') {
+        if (Array.isArray(mediaKey.data)) return mediaKey.data.length;
+        if (typeof mediaKey.length === 'number') return mediaKey.length;
+        if (typeof mediaKey.byteLength === 'number') return mediaKey.byteLength;
+      }
+      return 0;
+    })();
+    if (isNewsletter && hasMediaPath && mediaKeyLength === 0) {
+      state.logger?.warn?.({
+        jid: remoteJid,
+        id: this.getId(rawMsg),
+        msgType: nMsgType,
+      }, 'Skipping newsletter media download because media key is missing');
+      return null;
+    }
     const fileLength = typeof msg.fileLength === 'object'
       ? msg.fileLength.low ?? msg.fileLength.toNumber()
       : msg.fileLength;

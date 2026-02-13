@@ -1869,6 +1869,21 @@ const connectToWhatsApp = async (retry = 1) => {
                     sentCandidates.forEach((id) => state.sentMessages.delete(id));
                     continue;
                 }
+                if (newsletterChat && rawMessage?.key?.fromMe) {
+                    const rejectedId = sentCandidates.find((id) => getNewsletterAckError(id));
+                    if (rejectedId) {
+                        const ackError = getNewsletterAckError(rejectedId);
+                        state.logger?.debug?.({
+                            jid: remoteJid,
+                            outboundId,
+                            messageId,
+                            serverId,
+                            rejectedId,
+                            error: ackError,
+                        }, 'Skipping newsletter fromMe upsert for ack-rejected send');
+                        continue;
+                    }
+                }
                 if (newsletterChat && rawMessage?.key?.fromMe && outboundId && state.lastMessages[outboundId]) {
                     mapNewsletterServerIdFromOutbound({ outboundId, serverId });
                     continue;
