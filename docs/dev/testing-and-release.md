@@ -1,7 +1,7 @@
 # Testing And Release
 
 > Owner: WA2DC maintainers
-> Last reviewed: 2026-02-12
+> Last reviewed: 2026-02-24
 > Scope: Validation commands, CI expectations, and packaging constraints.
 
 ## Validation matrix
@@ -21,10 +21,11 @@ CI executes the following on `ubuntu-latest`, `macos-latest`, and `windows-lates
 
 ## Packaging model
 
-Release pipeline builds packaged binaries from an ESM bundle:
+Release pipeline builds packaged binaries from a pkg-safe CJS bundle:
 
-- esbuild bundles `src/runner.js` to `out.js` (ESM)
-- `pkg` produces platform binaries from `out.js`
+- esbuild bundles `src/runner.js` to `out.js` (ESM) for Node smoke checks
+- esbuild bundles `src/runner.js` to `out.cjs` (CJS) for pkg
+- `pkg` produces platform binaries from `out.cjs` with `--no-bytecode`
 - runtime may branch on `process.pkg` for packaged-vs-source behavior
 
 ## Packaging-safe dependency rules
@@ -35,4 +36,4 @@ When adding/changing dependencies, verify:
 - pkg can resolve/load any runtime assets
 - dynamic fs/native addon behavior is explicitly handled when required
 
-Generated artifacts (`out.js`, `build/`) should not be manually edited.
+Generated artifacts (`out.js`, `out.cjs`, `build/`) should not be manually edited.

@@ -61,6 +61,7 @@ function buildOutputPath(pkgOs, pkgArch) {
 const args = new Set(process.argv.slice(2));
 const shouldSmokeTest = args.has("--smoke");
 const nodeMajor = process.env.WA2DC_PKG_NODE_MAJOR || "24";
+const pkgEntrypoint = "out.cjs";
 
 const pkgOs = platformToPkgOs(process.platform);
 const pkgArch = archToPkgArch(process.arch);
@@ -72,23 +73,23 @@ const target = `node${nodeMajor}-${pkgOs}-${pkgArch}`;
 const outputPath = buildOutputPath(pkgOs, pkgArch);
 const resolvedOutputPath = path.resolve(outputPath);
 
-run(getBin("npm"), ["run", "bundle"]);
+run(getBin("npm"), ["run", "bundle:pkg"]);
 
 const pkgArgs = [
 	"-y",
 	"@yao-pkg/pkg",
-	"out.js",
+	pkgEntrypoint,
 	"-t",
 	target,
 	"--options",
 	"no-warnings",
 	"-o",
 	outputPath,
+	"--no-bytecode",
+	"--public",
+	"--public-packages",
+	"*",
 ];
-
-if (pkgOs === "win" || pkgArch === "arm64") {
-	pkgArgs.push("--no-bytecode", "--public", "--public-packages", "*");
-}
 
 run(getBin("npx"), pkgArgs);
 

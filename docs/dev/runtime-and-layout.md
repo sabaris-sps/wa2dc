@@ -1,7 +1,7 @@
 # Runtime And Layout
 
 > Owner: WA2DC maintainers
-> Last reviewed: 2026-02-12
+> Last reviewed: 2026-02-24
 > Scope: Runtime model, startup, and repository map.
 
 ## Runtime model
@@ -24,7 +24,8 @@ Primary flow:
 - Install deps: `npm ci`
 - Run with watchdog: `npm start`
 - Serve docs: `npm run docs`
-- Bundle for pkg: `npm run bundle`
+- Bundle for Node smoke: `npm run bundle`
+- Bundle for pkg: `npm run bundle:pkg`
 - Build local binary: `npm run build:bin`
 
 Smoke startup without external connections:
