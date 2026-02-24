@@ -1,51 +1,58 @@
-const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7d
-const DEFAULT_MAX_ENTRIES = 2000;
+import sqliteStore from "./persistence/sqliteStore.js";
+
+const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_MAX_ENTRIES = 10000;
 
 const buildKey = (key = {}) => {
-  const id = key.id || key?.keyId || null;
-  if (!id) return null;
-  const remoteJid = key.remoteJid || key?.participant || key?.participantId || '';
-  return `${remoteJid}|${id}`;
+	const id = key.id || key?.keyId || null;
+	if (!id) return null;
+	const remoteJid =
+		key.remoteJid || key?.participant || key?.participantId || "";
+	return `${remoteJid}|${id}`;
 };
 
 class MessageStore {
-  constructor({ ttlMs = DEFAULT_TTL_MS, maxEntries = DEFAULT_MAX_ENTRIES } = {}) {
-    this.ttlMs = ttlMs;
-    this.maxEntries = maxEntries;
-    this.cache = new Map();
-  }
+	constructor({
+		ttlMs = DEFAULT_TTL_MS,
+		maxEntries = DEFAULT_MAX_ENTRIES,
+	} = {}) {
+		this.ttlMs = ttlMs;
+		this.maxEntries = maxEntries;
+		this.cache = {
+			clear: () => {
+				this.clear();
+			},
+		};
+	}
 
-  get(key) {
-    const cacheKey = buildKey(key);
-    if (!cacheKey) return null;
-    const entry = this.cache.get(cacheKey);
-    if (!entry) return null;
-    if (entry.expiresAt <= Date.now()) {
-      this.cache.delete(cacheKey);
-      return null;
-    }
-    return entry.message;
-  }
+	get(key) {
+		const cacheKey = buildKey(key);
+		if (!cacheKey) return null;
+		const row = sqliteStore.getMessageStore(cacheKey);
+		if (!row) return null;
+		try {
+			return JSON.parse(row.value);
+		} catch {
+			return null;
+		}
+	}
 
-  set(message) {
-    const cacheKey = buildKey(message?.key);
-    if (!cacheKey || !message) return null;
-    const expiresAt = Date.now() + this.ttlMs;
-    this.cache.set(cacheKey, { message, expiresAt });
-    this.prune();
-    return message;
-  }
+	set(message) {
+		const cacheKey = buildKey(message?.key);
+		if (!cacheKey || !message) return null;
+		const expiresAt = Date.now() + this.ttlMs;
+		sqliteStore.setMessageStore(cacheKey, JSON.stringify(message), expiresAt);
+		this.prune();
+		return message;
+	}
 
-  prune() {
-    if (this.cache.size <= this.maxEntries) return;
-    const overflow = this.cache.size - this.maxEntries;
-    const keys = this.cache.keys();
-    for (let i = 0; i < overflow; i += 1) {
-      const { value, done } = keys.next();
-      if (done) break;
-      this.cache.delete(value);
-    }
-  }
+	prune() {
+		sqliteStore.pruneMessageStore(this.maxEntries);
+	}
+
+	clear() {
+		sqliteStore.clearMessageStore();
+	}
 }
 
 const messageStore = new MessageStore();

@@ -4,7 +4,7 @@
   <img src="docs/_media/logo.png" alt="WA2DC logo" width="180" />
 </p>
 
-[![Latest release](https://img.shields.io/github/v/release/arespawn/WhatsAppToDiscord?display_name=tag&sort=semver&logo=github)](https://github.com/arespawn/WhatsAppToDiscord/releases/latest) [![Total downloads](https://img.shields.io/github/downloads/arespawn/WhatsAppToDiscord/total?logo=github)](https://github.com/arespawn/WhatsAppToDiscord/releases) [![License](https://img.shields.io/github/license/arespawn/WhatsAppToDiscord)](LICENSE.txt) [![Tests](https://img.shields.io/github/actions/workflow/status/arespawn/WhatsAppToDiscord/ci-tests.yml?label=tests&logo=github)](https://github.com/arespawn/WhatsAppToDiscord/actions/workflows/ci-tests.yml) [![Lint](https://img.shields.io/github/actions/workflow/status/arespawn/WhatsAppToDiscord/lint.yml?label=lint&logo=eslint&logoColor=white)](https://github.com/arespawn/WhatsAppToDiscord/actions/workflows/lint.yml) [![Docker images](https://img.shields.io/github/actions/workflow/status/arespawn/WhatsAppToDiscord/docker-publish.yml?label=docker&logo=docker)](https://github.com/arespawn/WhatsAppToDiscord/actions/workflows/docker-publish.yml) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?logo=github)](https://github.com/arespawn/WhatsAppToDiscord/pulls)
+[![Latest release](https://img.shields.io/github/v/release/arespawn/WhatsAppToDiscord?display_name=tag&sort=semver&logo=github)](https://github.com/arespawn/WhatsAppToDiscord/releases/latest) [![Total downloads](https://img.shields.io/github/downloads/arespawn/WhatsAppToDiscord/total?logo=github)](https://github.com/arespawn/WhatsAppToDiscord/releases) [![License](https://img.shields.io/github/license/arespawn/WhatsAppToDiscord)](LICENSE.txt) [![Tests](https://img.shields.io/github/actions/workflow/status/arespawn/WhatsAppToDiscord/ci-tests.yml?label=tests&logo=github)](https://github.com/arespawn/WhatsAppToDiscord/actions/workflows/ci-tests.yml) [![Lint](https://img.shields.io/github/actions/workflow/status/arespawn/WhatsAppToDiscord/lint.yml?label=lint&logo=biome)](https://github.com/arespawn/WhatsAppToDiscord/actions/workflows/lint.yml) [![Docker images](https://img.shields.io/github/actions/workflow/status/arespawn/WhatsAppToDiscord/docker-publish.yml?label=docker&logo=docker)](https://github.com/arespawn/WhatsAppToDiscord/actions/workflows/docker-publish.yml) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?logo=github)](https://github.com/arespawn/WhatsAppToDiscord/pulls)
 
 WhatsAppToDiscord (WA2DC) is a self-hosted bridge that mirrors WhatsApp chats into Discord using WhatsApp Web (via [Baileys](https://github.com/WhiskeySockets/Baileys)) and a Discord bot (via [discord.js](https://github.com/discordjs/discord.js)).
 
@@ -15,7 +15,7 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 
 ## Requirements
 
-- Node.js 24 or higher (or Docker)
+- Node.js 24 or higher
 
 ## Highlights
 
@@ -27,6 +27,14 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 ## Security notes
 
 - WA2DC intentionally relies on Discord permissions for access control. Keep the control channel private and restrict who can use bot commands using Discord role/channel permissions.
+
+## Persistence
+
+- WA2DC stores app state and WhatsApp auth keys in `storage/wa2dc.sqlite` (embedded SQLite, no external database service required).
+- On first boot after upgrade, legacy file-based data is migrated automatically from `storage/settings`, `storage/chats`, `storage/contacts`, `storage/lastMessages`, `storage/lastTimestamp`, and `storage/baileys/*`.
+- Migrated legacy files are moved to `storage/legacy-backup-<timestamp>/`.
+- Optional payload encryption-at-rest is available through `WA2DC_DB_PASSPHRASE` (set it before first DB creation).
+- If the DB is encrypted and `WA2DC_DB_PASSPHRASE` is missing or wrong, WA2DC exits during startup instead of running with invalid auth state.
 
 ## Disclaimer
 

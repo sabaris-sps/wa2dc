@@ -26,17 +26,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Bundle with esbuild
-        run: npm run bundle
+      - name: Bundle for pkg with esbuild
+        run: npm run bundle:pkg
 
       - name: Generate binaries
         run: |
           mkdir -p build
-          npx -y @yao-pkg/pkg out.cjs -t node24-linux-x64   --options no-warnings -o build/WA2DC-Linux
-          npx -y @yao-pkg/pkg out.cjs -t node24-linux-arm64 --options no-warnings -o build/WA2DC-Linux-arm64
-          npx -y @yao-pkg/pkg out.cjs -t node24-macos-x64   --options no-warnings -o build/WA2DC-macOS
-          npx -y @yao-pkg/pkg out.cjs -t node24-win-x64     --options no-warnings --no-bytecode \
-                                                      --public --public-packages "*" -o build/WA2DC.exe
+          npx -y @yao-pkg/pkg out.cjs -t node24-linux-x64   --options no-warnings --no-bytecode --public --public-packages "*" -o build/WA2DC-Linux
+          npx -y @yao-pkg/pkg out.cjs -t node24-linux-arm64 --options no-warnings --no-bytecode --public --public-packages "*" -o build/WA2DC-Linux-arm64
+          npx -y @yao-pkg/pkg out.cjs -t node24-macos-x64   --options no-warnings --no-bytecode --public --public-packages "*" -o build/WA2DC-macOS
+          npx -y @yao-pkg/pkg out.cjs -t node24-win-x64     --options no-warnings --no-bytecode --public --public-packages "*" -o build/WA2DC.exe
 
       - name: Generate checksums
         run: |

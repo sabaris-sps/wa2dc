@@ -1,83 +1,76 @@
+import { ONE_WAY_MODES } from "./oneWay.js";
+
 const state = {
-  settings: {
-    Whitelist: [],
-    DiscordPrefixText: null,
-    DiscordPrefix: false,
-    WAGroupPrefix: false,
-    WASenderPlatformSuffix: false,
-    UploadAttachments: true,
-    Token: '',
-    GuildID: '',
-    Categories: [],
-    ControlChannelID: '',
-    LocalDownloads: false,
-    LocalDownloadMessage: 'Downloaded a file larger than the upload limit, check it out at {url}',
-    DownloadDir: './downloads',
-    DownloadDirLimitGB: 0,
-    DownloadDirMaxAgeDays: 0,
-    DownloadDirMinFreeGB: 0,
-    DiscordFileSizeLimit: 8 * 1024 * 1024,
-    LocalDownloadServer: false,
-    LocalDownloadServerHost: 'localhost',
-    LocalDownloadServerBindHost: '127.0.0.1',
-    LocalDownloadServerPort: 8080,
-    LocalDownloadServerSecret: '',
-    LocalDownloadLinkTTLSeconds: 0,
-    UseHttps: false,
-    HttpsKeyPath: '',
-    HttpsCertPath: '',
-    Publish: false,
-    ChangeNotifications: false,
-    MirrorWAStatuses: true,
-    autoSaveInterval: 5 * 60,
-    lastMessageStorage: 500,
-    oneWay: 0b11,
-    redirectBots: true,
-    redirectWebhooks: false,
-    DeleteMessages: true,
-    ReadReceipts: true,
-    ReadReceiptMode: 'public',
-    UpdateChannel: 'stable',
-    KeepOldBinary: true,
-    UpdatePromptMessage: null,
-    RollbackPromptMessage: null,
-    PinDurationSeconds: 7 * 24 * 60 * 60,
-    WhatsAppDiscordMentionLinks: {},
-    HidePhoneNumbers: false,
-    PrivacySalt: '',
-  },
-  dcClient: null,
-  waClient: null,
-  chats: {},
-  contacts: {},
-  startTime: 0,
-  logger: null,
-  lastMessages: null,
-  /**
-   * Stores WhatsApp message IDs that originate from Discord so that
-   * they are not echoed back to Discord when received from WhatsApp.
-  */
-  sentMessages: new Set(),
-  /**
-   * Tracks Discord reactions that mirror WhatsApp reactions so we can
-   * update or remove them when WhatsApp users change their reaction.
-   * Structure: { [discordMessageId]: { [waJid]: emoji } }
-   */
-  reactions: {},
-  /**
-   * Stores WhatsApp message IDs for reactions originating from Discord
-   * to avoid echoing them back when WhatsApp sends confirmation events.
-   */
-  sentReactions: new Set(),
-  /**
-   * Tracks pin actions we initiated to avoid echoing them back when
-   * WhatsApp emits pin-in-chat events.
-   */
-  sentPins: new Set(),
-  goccRuns: {},
-  updateInfo: null,
-  version: '',
-  shutdownRequested: false,
+	settings: {
+		Whitelist: [],
+		DiscordPrefixText: null,
+		DiscordPrefix: false,
+		WAGroupPrefix: false,
+		WASenderPlatformSuffix: false,
+		DiscordEmbedsToWhatsApp: false,
+		UploadAttachments: true,
+		NewsletterMediaUrlFallback: false,
+		Token: "",
+		GuildID: "",
+		Categories: [],
+		ControlChannelID: "",
+		LocalDownloads: false,
+		LocalDownloadMessage:
+			"Downloaded a file larger than the upload limit, check it out at {url}",
+		DownloadDir: "./downloads",
+		DownloadDirLimitGB: 0,
+		DownloadDirMaxAgeDays: 0,
+		DownloadDirMinFreeGB: 0,
+		DiscordFileSizeLimit: 8 * 1024 * 1024,
+		LocalDownloadServer: false,
+		LocalDownloadServerHost: "localhost",
+		LocalDownloadServerBindHost: "127.0.0.1",
+		LocalDownloadServerPort: 8080,
+		LocalDownloadServerSecret: "",
+		LocalDownloadLinkTTLSeconds: 0,
+		UseHttps: false,
+		HttpsKeyPath: "",
+		HttpsCertPath: "",
+		Publish: false,
+		ChangeNotifications: false,
+		MirrorWAStatuses: true,
+		autoSaveInterval: 5 * 60,
+		lastMessageStorage: 500,
+		oneWay: ONE_WAY_MODES.TWO_WAY,
+		redirectBots: true,
+		redirectWebhooks: false,
+		redirectAnnouncementWebhooks: false,
+		DeleteMessages: true,
+		ReadReceipts: true,
+		ReadReceiptMode: "public",
+		UpdateChannel: "stable",
+		KeepOldBinary: true,
+		UpdatePromptMessage: null,
+		RollbackPromptMessage: null,
+		PinDurationSeconds: 7 * 24 * 60 * 60,
+		WhatsAppDiscordMentionLinks: {},
+		HidePhoneNumbers: false,
+		PrivacySalt: "",
+	},
+	dcClient: null,
+	waClient: null,
+	chats: {},
+	contacts: {},
+	startTime: 0,
+	logger: null,
+	lastMessages: null,
+
+	sentMessages: new Set(),
+
+	reactions: {},
+
+	sentReactions: new Set(),
+
+	sentPins: new Set(),
+	goccRuns: {},
+	updateInfo: null,
+	version: "",
+	shutdownRequested: false,
 };
 
 export const settings = state.settings;

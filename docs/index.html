@@ -2,14 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>WhatsApp To Discord | A WhatsApp - Discord Bridge</title>
+    <title>WhatsApp To Discord | Self-hosted WhatsApp-Discord Bridge</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <meta name="description" content="WhatsAppToDiscord is a Discord bot that uses WhatsApp Web as a bridge between Discord and WhatsApp. It brings your WhatsApp conversations to Discord!" />
-    <meta name="keywords" content="WhatsApp To Discord, WhatsApp Discord Bridge, WA2DC, Discord, WhatsApp">
-    <meta name="author" content="arespawn (originally by Fatih Kilic)">
+    <meta name="description" content="WhatsAppToDiscord (WA2DC) is a self-hosted bridge that mirrors WhatsApp chats into Discord. Project website with setup, commands, and troubleshooting." />
+    <meta name="keywords" content="WhatsApp to Discord, WhatsApp Discord bridge, WA2DC, self-hosted Discord bot, Baileys, discord.js" />
+    <meta name="author" content="arespawn (originally by Fatih Kilic)" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="theme-color" content="#42b983" />
     <meta name="color-scheme" content="light dark" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
-	    <meta name="google-site-verification" content="4WuEAQieonPKWBwMh1Yl3NyKWJiGcYt8u3ijQfHU26g" />
+    <meta name="google-site-verification" content="4WuEAQieonPKWBwMh1Yl3NyKWJiGcYt8u3ijQfHU26g" />
+    <link rel="canonical" href="https://arespawn.github.io/WhatsAppToDiscord/" />
+    <link rel="icon" href="_media/logo.png" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WhatsApp To Discord" />
+    <meta property="og:title" content="WhatsApp To Discord | Self-hosted WhatsApp-Discord Bridge" />
+    <meta property="og:description" content="Official project website for WhatsAppToDiscord (WA2DC), including setup, commands, and troubleshooting." />
+    <meta property="og:url" content="https://arespawn.github.io/WhatsAppToDiscord/" />
+    <meta property="og:image" content="https://arespawn.github.io/WhatsAppToDiscord/_media/logo.png" />
+    <meta property="og:image:alt" content="WhatsApp To Discord logo" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="WhatsApp To Discord | Self-hosted WhatsApp-Discord Bridge" />
+    <meta name="twitter:description" content="Official project website for WhatsAppToDiscord (WA2DC), including setup, commands, and troubleshooting." />
+    <meta name="twitter:image" content="https://arespawn.github.io/WhatsAppToDiscord/_media/logo.png" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "WhatsAppToDiscord",
+        "description": "A self-hosted bridge that mirrors WhatsApp chats into Discord.",
+        "url": "https://arespawn.github.io/WhatsAppToDiscord/",
+        "codeRepository": "https://github.com/arespawn/WhatsAppToDiscord",
+        "programmingLanguage": "JavaScript",
+        "license": "https://github.com/arespawn/WhatsAppToDiscord/blob/main/LICENSE.txt"
+      }
+    </script>
     <link id="docsify-theme" rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css" />
     <style>
       .wa2dc-theme-toggle {
@@ -37,13 +65,125 @@
   </head>
   <body>
     <div id="app"></div>
+    <noscript>
+      <main>
+        <h1>WhatsApp To Discord</h1>
+        <p>This site needs JavaScript for the full UI. You can still read the project pages directly:</p>
+        <ul>
+          <li><a href="README.md">Home</a></li>
+          <li><a href="setup.md">Setup</a></li>
+          <li><a href="commands.md">Commands</a></li>
+          <li><a href="faq.md">FAQ</a></li>
+          <li><a href="sponsor.md">Sponsor</a></li>
+          <li><a href="privacypolicy.txt">Privacy Policy</a></li>
+        </ul>
+      </main>
+    </noscript>
     <script>
       const WA2DC_DOCS_THEME_STORAGE_KEY = 'wa2dc_docs_theme';
       const WA2DC_DOCS_THEMES = Object.freeze({
         light: '//cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css',
         dark: '//cdn.jsdelivr.net/npm/docsify@4/lib/themes/dark.css',
       });
+      const WA2DC_DOCS_BASE_URL = 'https://arespawn.github.io/WhatsAppToDiscord/';
       const WA2DC_DOCS_LOGO = '_media/logo.png';
+      const WA2DC_DOCS_OG_IMAGE_URL = `${WA2DC_DOCS_BASE_URL}_media/logo.png`;
+      const WA2DC_DOCS_DEFAULT_SEO = Object.freeze({
+        title: 'WhatsApp To Discord | Self-hosted WhatsApp-Discord Bridge',
+        description:
+          'WhatsAppToDiscord (WA2DC) is a self-hosted bridge that mirrors WhatsApp chats into Discord. Project website with setup, commands, and troubleshooting.',
+      });
+      const WA2DC_DOCS_ROUTE_SEO = Object.freeze({
+        '/': WA2DC_DOCS_DEFAULT_SEO,
+        '/setup': Object.freeze({
+          title: 'Setup Guide | WhatsApp To Discord',
+          description:
+            'Step-by-step setup guide for WhatsAppToDiscord, including Discord bot creation, permissions, and first WhatsApp pairing.',
+        }),
+        '/commands': Object.freeze({
+          title: 'Commands Reference | WhatsApp To Discord',
+          description:
+            'Complete WA2DC slash command reference for conversation management, whitelist controls, downloads, and maintenance.',
+        }),
+        '/faq': Object.freeze({
+          title: 'FAQ | WhatsApp To Discord',
+          description:
+            'Frequently asked questions for WA2DC, including hosting, permissions, troubleshooting, and common setup issues.',
+        }),
+        '/sponsor': Object.freeze({
+          title: 'Sponsor | WhatsApp To Discord',
+          description:
+            'Support WhatsAppToDiscord development via GitHub Sponsors or Buy Me a Coffee.',
+        }),
+        '/privacypolicy': Object.freeze({
+          title: 'Privacy Policy | WhatsApp To Discord',
+          description:
+            'Privacy and data handling information for WhatsAppToDiscord users.',
+        }),
+      });
+      const WA2DC_DOCS_ROUTE_CANONICAL = Object.freeze({
+        '/': '',
+        '/setup': 'setup.md',
+        '/commands': 'commands.md',
+        '/faq': 'faq.md',
+        '/sponsor': 'sponsor.md',
+        '/privacypolicy': 'privacypolicy.txt',
+      });
+
+      function wa2dcGetCurrentDocsRoute() {
+        const hash = window.location.hash || '#/';
+        const route = hash.startsWith('#') ? hash.slice(1) : hash;
+        const path = route.split('?')[0] || '/';
+        const normalized = path.startsWith('/') ? path : `/${path}`;
+        if (normalized === '/README' || normalized === '/README.md') {
+          return '/';
+        }
+        return normalized.toLowerCase();
+      }
+
+      function wa2dcUpsertMeta(attribute, key, value) {
+        if (!key || typeof value !== 'string' || value.length === 0) return;
+        let tag = document.querySelector(`meta[${attribute}="${key}"]`);
+        if (!tag) {
+          tag = document.createElement('meta');
+          tag.setAttribute(attribute, key);
+          document.head.appendChild(tag);
+        }
+        tag.setAttribute('content', value);
+      }
+
+      function wa2dcSetCanonical(url) {
+        if (!url) return;
+        let canonicalTag = document.querySelector('link[rel="canonical"]');
+        if (!canonicalTag) {
+          canonicalTag = document.createElement('link');
+          canonicalTag.setAttribute('rel', 'canonical');
+          document.head.appendChild(canonicalTag);
+        }
+        canonicalTag.setAttribute('href', url);
+      }
+
+      function wa2dcApplySeoForCurrentRoute() {
+        const route = wa2dcGetCurrentDocsRoute();
+        const seo = WA2DC_DOCS_ROUTE_SEO[route] || WA2DC_DOCS_DEFAULT_SEO;
+        const pageUrl = route === '/' ? WA2DC_DOCS_BASE_URL : `${WA2DC_DOCS_BASE_URL}#${route}`;
+        const canonicalPath = WA2DC_DOCS_ROUTE_CANONICAL[route];
+        const canonicalUrl =
+          typeof canonicalPath === 'string'
+            ? `${WA2DC_DOCS_BASE_URL}${canonicalPath}`
+            : WA2DC_DOCS_BASE_URL;
+
+        document.title = seo.title;
+        wa2dcUpsertMeta('name', 'description', seo.description);
+        wa2dcUpsertMeta('property', 'og:title', seo.title);
+        wa2dcUpsertMeta('property', 'og:description', seo.description);
+        wa2dcUpsertMeta('property', 'og:url', pageUrl);
+        wa2dcUpsertMeta('property', 'og:image', WA2DC_DOCS_OG_IMAGE_URL);
+        wa2dcUpsertMeta('name', 'twitter:title', seo.title);
+        wa2dcUpsertMeta('name', 'twitter:description', seo.description);
+        wa2dcUpsertMeta('name', 'twitter:image', WA2DC_DOCS_OG_IMAGE_URL);
+        wa2dcSetCanonical(canonicalUrl);
+      }
 
       function wa2dcGetSavedTheme() {
         try {
@@ -128,6 +268,7 @@
 
       // Apply the theme before Docsify renders.
       wa2dcSetTheme(wa2dcCurrentTheme);
+      wa2dcApplySeoForCurrentRoute();
 
       window.$docsify = {
         loadSidebar: true,
@@ -140,10 +281,12 @@
             hook.ready(() => {
               wa2dcEnsureThemeToggle();
               wa2dcUpdateLogo();
+              wa2dcApplySeoForCurrentRoute();
             });
 
             hook.doneEach(() => {
               wa2dcUpdateLogo();
+              wa2dcApplySeoForCurrentRoute();
             });
           },
         ],
