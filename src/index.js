@@ -9,6 +9,7 @@ import state from "./state.js";
 import storage from "./storage.js";
 import utils from "./utils.js";
 import whatsappHandler from "./whatsappHandler.js";
+import packageInfo from "../package.json" with { type: "json" };
 
 const isSmokeTest = process.env.WA2DC_SMOKE_TEST === "1";
 
@@ -17,7 +18,11 @@ if (!globalThis.crypto) {
 }
 
 (async () => {
-	const version = "v2.1.6-2.1.6";
+	const packageVersion =
+		typeof packageInfo?.version === "string" ? packageInfo.version : "0.0.0";
+	const version = packageVersion.startsWith("v")
+		? packageVersion
+		: `v${packageVersion}`;
 	state.version = version;
 	const streams = [
 		{ stream: pino.destination("logs.txt") },
