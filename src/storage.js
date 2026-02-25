@@ -445,9 +445,19 @@ const setup = {
 
 	async firstRun() {
 		const settings = state.settings;
+		const flushLogger = async () =>
+			new Promise((resolve) => {
+				if (typeof state.logger?.flush === "function") {
+					state.logger.flush(resolve);
+					return;
+				}
+				resolve();
+			});
 		state.logger?.info("It seems like this is your first run.");
+		await flushLogger();
 		if (process.env.WA2DC_TOKEN === "CHANGE_THIS_TOKEN") {
 			state.logger?.info("Please set WA2DC_TOKEN environment variable.");
+			await flushLogger();
 			process.exit();
 		}
 		const input = async (query) =>
