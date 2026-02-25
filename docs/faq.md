@@ -26,11 +26,11 @@ When you invite the bot, it should create a text channel called `#control-room`.
 Possibly, but be aware you may get banned. On GitHub, I've seen two instances ([#1](https://github.com/FKLC/WhatsAppToDiscord/issues/75#issuecomment-1179018481), [#2](https://github.com/FKLC/WhatsAppToDiscord/issues/88#issuecomment-1229547828)) of running the bot on a server, and apparently, it is fine, but always be cautious.
 
 ## Sending voice messages on Discord
-There are 3 options you can use.
-1. You can record using your computer's built-in software and upload to Discord.
-1. If you are using Discord Web (instead of the desktop client), you have 2 options. (Please note that I don't maintain any of the projects listed below)
-    1. Using [@eibrahim95's extension](https://chrome.google.com/webstore/detail/discord-voice-messages/emfegmjcadbmdcmdecepfkmhnenpnfip) and chaning file names, making their extensions *"mp3"* instead of *"wav"*.
-    2. Using [@magadan's extension](https://github.com/magadan/discord-voice-messages-mp3). This is a modified version [@eibrahim95's extension](https://chrome.google.com/webstore/detail/discord-voice-messages/emfegmjcadbmdcmdecepfkmhnenpnfip). It creates *"mp3"* files automatically instead of *"wav"* files, so you don't have to modify the file name every time. However, its setup is a bit longer. You have to build and install the extension using the readme file.
+WA2DC can mirror Discord voice-style attachments to WhatsApp voice notes (`ptt`).
+
+- For best compatibility, install `ffmpeg` on the host running WA2DC. The bridge will transcode Discord voice uploads to Opus/Ogg mono before sending.
+- If `ffmpeg` is not installed, WA2DC still attempts a raw audio send, but some voice uploads may fail on WhatsApp clients.
+- `audio-decode` remains optional and is only needed for waveform generation.
 
 ## Can I bridge WhatsApp calls to Discord?
 No. The WhatsApp Web protocol used by the bot does not expose the real-time audio or video streams of a call. Incoming and missed calls are only sent as notifications to Discord, so the bot cannot relay or receive live WhatsApp calls.
