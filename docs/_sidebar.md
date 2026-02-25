@@ -1,6 +1,7 @@
 - [Home](/ "WhatsApp To Discord | A WhatsApp - Discord Bridge")
   - [Baileys 7 migration](README.md?id=baileys-7-migration "Baileys 7 migration | WhatsApp To Discord")
 - [Setup](setup.md "Setup | WhatsApp To Discord")
+- [Installer Scripts](install-scripts.md "Installer Scripts | WhatsApp To Discord")
 - [Commands](commands.md "Commands | WhatsApp To Discord")
 - [Developer Docs](dev/README.md "Developer Docs | WhatsApp To Discord")
   - [Runtime & Layout](dev/runtime-and-layout.md "Runtime and Layout | WhatsApp To Discord")
