@@ -94,6 +94,10 @@ This keeps you in control of when updates are applied instead of auto-updating.
 
 The setup is short, but challenging for some. So, we explained every step in detail for your convenience, just [click here](setup.md) to get started.
 
+## Installer scripts
+
+If you prefer source installation from terminal, see [Installer Scripts](install-scripts.md) for Linux/macOS (`install_script.sh`) and Windows (`install_script.ps1`) usage and options.
+
 ## Commands
 
 The bot supports many commands to allow rich customization. You can see the commands by [clicking here.](commands.md)

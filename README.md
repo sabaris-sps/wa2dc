@@ -17,6 +17,15 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 
 - Node.js 24 or higher
 
+## Installer scripts
+
+For source installs/updates with automatic dependency setup:
+
+- Linux/macOS: `./install_script.sh`
+- Windows PowerShell: `.\install_script.ps1`
+
+Detailed options and platform notes are documented in [`docs/install-scripts.md`](docs/install-scripts.md).
+
 ## Highlights
 
 - Mirrors messages, media, reactions, and edits between WhatsApp and Discord
