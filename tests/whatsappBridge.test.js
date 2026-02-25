@@ -1466,6 +1466,113 @@ test("Discord embed images are not duplicated when CDN and proxy URLs point to t
 	}
 });
 
+test("Discord voice-style audio attachments are sent as WhatsApp ptt messages", async () => {
+	const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
+	try {
+		utils.whatsapp.createDocumentContent = (attachment) => ({
+			audio: { url: attachment.url },
+			mimetype: attachment.contentType,
+		});
+
+		const voiceBytes = Buffer.from("not-real-ogg-audio");
+		const waveformBytes = Buffer.from([1, 2, 3, 4]);
+		const attachmentUrl = `data:audio/ogg;base64,${voiceBytes.toString("base64")}`;
+
+		harness.fakeClient.ev.emit("discordMessage", {
+			jid: "120363123456789@s.whatsapp.net",
+			forwardContext: null,
+			message: {
+				id: "dc-voice-audio-ptt",
+				content: "",
+				cleanContent: "",
+				webhookId: null,
+				author: { username: "BridgeUser" },
+				member: { displayName: "BridgeUser" },
+				channel: { send: async () => {} },
+				attachments: new Map([
+					[
+						"attachment-1",
+						{
+							id: "attachment-1",
+							url: attachmentUrl,
+							name: "voice-message",
+							contentType: "audio/ogg",
+							duration: 4,
+							waveform: waveformBytes.toString("base64"),
+						},
+					],
+				]),
+				stickers: new Map(),
+				embeds: [],
+				mentions: { users: new Map(), members: new Map(), roles: new Map() },
+			},
+		});
+
+		await delay(80);
+
+		assert.equal(harness.fakeClient.sendCalls.length, 1);
+		const sentContent = harness.fakeClient.sendCalls[0]?.content || {};
+		assert.equal(sentContent.ptt, true);
+		assert.equal(sentContent.seconds, 4);
+		assert.ok(Buffer.isBuffer(sentContent.audio));
+		assert.ok(Buffer.isBuffer(sentContent.waveform));
+		assert.ok(String(sentContent.mimetype || "").startsWith("audio/ogg"));
+	} finally {
+		harness.cleanup();
+	}
+});
+
+test("Regular Discord audio attachments are not forced into ptt mode", async () => {
+	const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
+	try {
+		utils.whatsapp.createDocumentContent = (attachment) => ({
+			audio: { url: attachment.url },
+			mimetype: attachment.contentType,
+		});
+
+		const audioBytes = Buffer.from("not-real-mp3-audio");
+		const attachmentUrl = `data:audio/mpeg;base64,${audioBytes.toString("base64")}`;
+
+		harness.fakeClient.ev.emit("discordMessage", {
+			jid: "120363123456789@s.whatsapp.net",
+			forwardContext: null,
+			message: {
+				id: "dc-regular-audio",
+				content: "",
+				cleanContent: "",
+				webhookId: null,
+				author: { username: "BridgeUser" },
+				member: { displayName: "BridgeUser" },
+				channel: { send: async () => {} },
+				attachments: new Map([
+					[
+						"attachment-1",
+						{
+							id: "attachment-1",
+							url: attachmentUrl,
+							name: "clip.mp3",
+							contentType: "audio/mpeg",
+						},
+					],
+				]),
+				stickers: new Map(),
+				embeds: [],
+				mentions: { users: new Map(), members: new Map(), roles: new Map() },
+			},
+		});
+
+		await delay(80);
+
+		assert.equal(harness.fakeClient.sendCalls.length, 1);
+		const sentContent = harness.fakeClient.sendCalls[0]?.content || {};
+		assert.notEqual(sentContent.ptt, true);
+		assert.ok(Buffer.isBuffer(sentContent.audio));
+		assert.equal(sentContent.mimetype, "audio/mpeg");
+	} finally {
+		harness.cleanup();
+	}
+});
+
 test("Discord replies warn with interpolated message storage size when quoted message is missing", async () => {
 	const harness = await setupWhatsAppHarness({ oneWay: 0b11 });
 	const originalLimit = state.settings.lastMessageStorage;
