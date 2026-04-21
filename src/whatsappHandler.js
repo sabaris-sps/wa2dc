@@ -2467,7 +2467,7 @@ const connectToWhatsApp = async (retry = 1) => {
     auth: authState,
     logger: state.logger,
     markOnlineOnConnect: false,
-    syncFullHistory: true,
+    syncFullHistory: false,
     shouldSyncHistoryMessage: () => true,
     generateHighQualityLinkPreview: true,
     cachedGroupMetadata: async (jid) =>
