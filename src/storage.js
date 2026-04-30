@@ -308,6 +308,10 @@ const storage = {
 				}
 			}
 
+			if (!Object.hasOwn(parsed, "HistorySyncDays")) {
+				parsed.HistorySyncDays = 1;
+			}
+
 			const settings = Object.assign(state.settings, parsed);
 			if (settings.Token === "") return setup.firstRun();
 			return settings;

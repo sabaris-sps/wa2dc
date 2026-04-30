@@ -2468,7 +2468,14 @@ const connectToWhatsApp = async (retry = 1) => {
     logger: state.logger,
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    shouldSyncHistoryMessage: () => true,
+    shouldSyncHistoryMessage: (msg) => {
+      const ts =
+        msg.messageTimestamp ||
+        msg.timestamp ||
+        (typeof msg.toNumber === "function" ? msg.toNumber() : msg);
+      const days = state.settings.HistorySyncDays || 1;
+      return ts ? ts >= Date.now() / 1000 - days * 86400 : true;
+    },
     generateHighQualityLinkPreview: true,
     cachedGroupMetadata: async (jid) =>
       groupMetadataCache.get(utils.whatsapp.formatJid(jid)),
@@ -2621,9 +2628,10 @@ const connectToWhatsApp = async (retry = 1) => {
   client.ev.on("messages.upsert", async (update) => {
     if (["notify", "append"].includes(update.type)) {
       for await (const rawMessage of update.messages) {
-        const messageId = normalizeBridgeMessageId(
-          utils.whatsapp.getId(rawMessage),
-        );
+        try {
+          const messageId = normalizeBridgeMessageId(
+            utils.whatsapp.getId(rawMessage),
+          );
         const outboundId = normalizeBridgeMessageId(rawMessage?.key?.id);
         const serverId = normalizeBridgeMessageId(
           getNewsletterServerIdFromMessage(rawMessage),
@@ -2830,9 +2838,12 @@ const connectToWhatsApp = async (retry = 1) => {
         });
         const ts = utils.whatsapp.getTimestamp(rawMessage);
         if (ts > state.startTime) state.startTime = ts;
+      } catch (err) {
+        state.logger?.error(err);
       }
     }
-  });
+  }
+});
 
   client.ev.on("messages.reaction", async (reactions) => {
     for await (const rawReaction of reactions) {

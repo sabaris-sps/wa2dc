@@ -209,10 +209,17 @@ if (!globalThis.crypto) {
 	}
 
 	if (!isSmokeTest) {
-		await utils.updater.run(version, { prompt: false });
-		state.logger.info("Update checked.");
-		await utils.discord.syncUpdatePrompt();
-		await utils.discord.syncRollbackPrompt();
+		// Run update checks in the background
+		void (async () => {
+			try {
+				await utils.updater.run(version, { prompt: false });
+				await utils.discord.syncUpdatePrompt();
+				await utils.discord.syncRollbackPrompt();
+				state.logger.info("Background update check completed.");
+			} catch (err) {
+				state.logger.error({ err }, "Background update check failed");
+			}
+		})();
 
 		setInterval(
 			async () => {

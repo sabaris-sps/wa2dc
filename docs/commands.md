@@ -358,6 +358,10 @@ Re-sync WhatsApp contacts/groups. Set `rename:true` to rename Discord channels t
 Change how often the bot persists state (seconds).  
 Usage: `/autosaveinterval seconds:<integer>`
 
+### `/historysyncdays`
+Change the number of days of history to sync from WhatsApp on startup.  
+Usage: `/historysyncdays days:<integer>`
+
 ### `/lastmessagestorage`
 Limit how many WhatsApp messages remain editable/deletable from Discord.  
 Usage: `/lastmessagestorage size:<integer>`

@@ -51,6 +51,7 @@ const state = {
 		WhatsAppDiscordMentionLinks: {},
 		HidePhoneNumbers: false,
 		PrivacySalt: "",
+		HistorySyncDays: 1,
 	},
 	dcClient: null,
 	waClient: null,

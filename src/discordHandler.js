@@ -2107,6 +2107,28 @@ const commandHandlers = {
       await ctx.reply(`Pong ${Date.now() - ctx.createdTimestamp}ms!`);
     },
   },
+  historysyncdays: {
+    description:
+      "Change the number of days of history to sync from WhatsApp on startup.",
+    options: [
+      {
+        name: "days",
+        description: "Number of days (minimum 1).",
+        type: ApplicationCommandOptionTypes.INTEGER,
+        required: true,
+      },
+    ],
+    async execute(ctx) {
+      const days = ctx.getIntegerOption("days");
+      if (days < 1) {
+        await ctx.reply("Please provide a number of days >= 1.");
+        return;
+      }
+      state.settings.HistorySyncDays = days;
+      await storage.saveSettings();
+      await ctx.reply(`History sync limit updated to **${days} day(s)**.`);
+    },
+  },
   chatinfo: {
     description: "Show which WhatsApp chat this channel is linked to.",
     async execute(ctx) {
